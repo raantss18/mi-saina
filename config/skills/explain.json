@@ -1,0 +1,1 @@
+{"name":"explain","trigger":"/explain","description":"Explique la dernière commande exécutée","icon":"📖","prompt":"Explique en détail ce que fait la dernière commande que tu as exécutée, pourquoi tu l'as choisie, et quels sont les effets sur le système."}

@@ -1,0 +1,1 @@
+{"name":"processes","trigger":"/top","description":"Processus les plus gourmands en ressources","icon":"⚡","prompt":"Montre-moi les 10 processus qui consomment le plus de ressources :\n[EXEC: ps aux --sort=-%cpu | head -11]"}

@@ -1,0 +1,1 @@
+{"name":"git","trigger":"/git","description":"Statut git du répertoire courant","icon":"🌿","prompt":"Donne-moi un résumé du statut git :\n[EXEC: git status 2>/dev/null && echo '---' && git log --oneline -5 2>/dev/null || echo 'Pas un dépôt git']"}

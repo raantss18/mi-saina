@@ -1,0 +1,42 @@
+# Python
+backend/data/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/
+mi-saina-env/
+localmind-env/
+.venv/
+venv/
+
+# Node.js
+frontend/node_modules/
+frontend/.next/
+frontend/.turbo/
+frontend/out/
+
+# Secrets — NE JAMAIS committer le .env réel
+.env
+!.env.example
+
+# Modèles — trop volumineux pour git
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Logs et données utilisateur
+*.log
+/tmp/
+backend/data/sessions.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

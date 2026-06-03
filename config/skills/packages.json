@@ -1,0 +1,1 @@
+{"name":"packages","trigger":"/pkg","description":"Vérifier les mises à jour disponibles","icon":"📦","prompt":"Vérifie les mises à jour disponibles sans les installer :\n[EXEC: checkupdates 2>/dev/null | head -20 || pacman -Qu 2>/dev/null | head -20]"}

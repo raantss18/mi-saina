@@ -1,0 +1,1 @@
+{"name":"network","trigger":"/net","description":"État du réseau et connexions actives","icon":"🌐","prompt":"Analyse l'état réseau :\n[EXEC: ip addr show | grep 'inet ' && echo '--- Connexions actives ---' && ss -tlnp | head -20]"}

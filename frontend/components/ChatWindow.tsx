@@ -1,0 +1,228 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+export interface Message {
+  role: "user" | "assistant" | "shell";
+  content: string;
+  model?: string;
+  streaming?: boolean;
+  command?: string;
+  // Pour les blocs shell streamés
+  shellStreaming?: boolean;
+  shellDone?: boolean;
+  returncode?: number;
+  error?: string;
+  waitingInput?: boolean;
+  attachments?: { type: string; name: string }[];
+}
+
+interface Props {
+  messages: Message[];
+  onShellInput?: (text: string) => void;
+}
+
+function ShellStreamBlock({
+  msg,
+  onInput,
+}: {
+  msg: Message;
+  onInput?: (text: string) => void;
+}) {
+  const [inputVal, setInputVal] = useState("");
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (preRef.current) {
+      preRef.current.scrollTop = preRef.current.scrollHeight;
+    }
+  }, [msg.content]);
+
+  const done = msg.shellDone;
+  const rc = msg.returncode;
+  const ok = done && rc === 0;
+  const failed = done && rc !== 0 && rc !== undefined;
+  const running = msg.shellStreaming;
+
+  const borderColor = !done ? "var(--accent)" : ok ? "var(--green)" : "var(--red)";
+  const headerBg = !done ? "rgba(88,166,255,0.08)" : ok ? "rgba(63,185,80,0.08)" : "rgba(248,81,73,0.08)";
+
+  const submitInput = () => {
+    if (inputVal.trim() !== "" || inputVal === "") {
+      onInput?.(inputVal);
+      setInputVal("");
+    }
+  };
+
+  return (
+    <div style={{
+      maxWidth: "80%",
+      background: "#070c11",
+      border: `1px solid ${borderColor}44`,
+      borderLeft: `3px solid ${borderColor}`,
+      borderRadius: 6, overflow: "hidden", fontFamily: "monospace",
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: "5px 12px", background: headerBg,
+        borderBottom: `1px solid ${borderColor}22`,
+        display: "flex", alignItems: "center", gap: 8,
+      }}>
+        {running && !done && (
+          <span style={{ color: "var(--accent)", animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
+        )}
+        {done && ok && <span style={{ color: "var(--green)" }}>✓</span>}
+        {done && failed && <span style={{ color: "var(--red)" }}>✗</span>}
+        <code style={{ fontSize: 11, color: "var(--text-muted)", flex: 1 }}>$ {msg.command}</code>
+        {done && (
+          <span style={{ fontSize: 10, color: ok ? "var(--green)" : "var(--red)" }}>
+            {ok ? "succès" : `rc=${rc}`}
+          </span>
+        )}
+        {running && !done && (
+          <span style={{ fontSize: 10, color: "var(--accent)" }}>en cours...</span>
+        )}
+      </div>
+
+      {/* Output */}
+      <pre ref={preRef} style={{
+        margin: 0, padding: "8px 12px",
+        color: "var(--text)", fontSize: 11,
+        whiteSpace: "pre-wrap", wordBreak: "break-word",
+        maxHeight: 400, overflowY: "auto",
+        lineHeight: 1.45,
+      }}>
+        {msg.content || " "}
+        {running && !done && <span style={{ color: "var(--accent)", animation: "blink 0.8s step-end infinite" }}>▋</span>}
+      </pre>
+
+      {/* Erreur */}
+      {msg.error && (
+        <div style={{ padding: "4px 12px", background: "rgba(248,81,73,0.1)", color: "var(--red)", fontSize: 11 }}>
+          {msg.error}
+        </div>
+      )}
+
+      {/* Input interactif */}
+      {(msg.waitingInput || (running && !done)) && (
+        <div style={{
+          borderTop: `1px solid ${borderColor}33`,
+          padding: "6px 10px",
+          display: "flex", gap: 6, alignItems: "center",
+          background: "rgba(88,166,255,0.04)",
+        }}>
+          <span style={{ color: "var(--accent)", fontSize: 12 }}>›</span>
+          <input
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitInput(); } }}
+            placeholder={msg.waitingInput ? "Répondre au prompt (ex: y, n, Enter)..." : "Entrée pour le processus..."}
+            autoFocus={msg.waitingInput}
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              color: "var(--text)", fontSize: 12, fontFamily: "monospace",
+            }}
+          />
+          <button
+            onClick={submitInput}
+            style={{
+              background: "var(--accent)", border: "none", color: "#000",
+              padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700,
+            }}
+          >
+            ↵
+          </button>
+          <button
+            onClick={() => onInput?.("")}
+            title="Envoyer Entrée vide"
+            style={{ background: "var(--border)", border: "none", color: "var(--text-muted)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}
+          >
+            Enter
+          </button>
+          <button
+            onClick={() => onInput?.("y")}
+            title="Répondre Oui"
+            style={{ background: "rgba(63,185,80,0.2)", border: "1px solid var(--green)", color: "var(--green)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}
+          >
+            Y
+          </button>
+          <button
+            onClick={() => onInput?.("n")}
+            title="Répondre Non"
+            style={{ background: "rgba(248,81,73,0.15)", border: "1px solid var(--red)", color: "var(--red)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}
+          >
+            N
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ChatWindow({ messages, onShellInput }: Props) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {messages.length === 0 && (
+        <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", marginTop: 60 }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>◈</div>
+          <div>LocalMind prêt</div>
+          <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
+            Commandes exécutées en direct — sortie en temps réel, prompts interactifs
+          </div>
+        </div>
+      )}
+
+      {messages.map((msg, i) => {
+        if (msg.role === "shell") {
+          return (
+            <ShellStreamBlock
+              key={i}
+              msg={msg}
+              onInput={onShellInput}
+            />
+          );
+        }
+
+        return (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start" }}>
+            {/* Attachements */}
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div style={{ display: "flex", gap: 4, marginBottom: 4, justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                {msg.attachments.map((a, j) => (
+                  <span key={j} style={{ fontSize: 10, background: "var(--border)", padding: "2px 6px", borderRadius: 4, color: "var(--text-muted)" }}>
+                    {a.type === "image" ? "🖼" : "📄"} {a.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{
+              maxWidth: "80%", padding: "10px 14px",
+              borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+              background: msg.role === "user" ? "rgba(88,166,255,0.12)" : "var(--surface)",
+              border: msg.role === "user" ? "1px solid var(--accent)" : "1px solid var(--border)",
+              fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+            }}>
+              {msg.content}
+              {msg.streaming && <span style={{ color: "var(--accent)", animation: "blink 1s step-end infinite" }}>▋</span>}
+            </div>
+            {msg.model && (
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3, padding: "0 4px" }}>{msg.model}</div>
+            )}
+          </div>
+        );
+      })}
+
+      <div ref={bottomRef} />
+      <style>{`
+        @keyframes blink { 50% { opacity: 0; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}
