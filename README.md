@@ -27,8 +27,8 @@
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/VOTRE_USER/mi-saina.git ~/Documents/Github/mi-saina
-cd ~/Documents/Github/mi-saina
+git clone https://github.com/raantss18/mi-saina.git
+cd mi-saina
 
 # 2. Lancer l'installation automatique
 bash install.sh
@@ -253,7 +253,7 @@ Vérifiez que le backend tourne et que votre modèle comprend la syntaxe `[EXEC:
 ### Mise à jour de l'application
 
 ```bash
-cd ~/Documents/Github/mi-saina
+cd mi-saina
 git pull
 bash install.sh   # Ré-exécuter pour mettre à jour les dépendances
 ```
