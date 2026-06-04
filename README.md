@@ -253,7 +253,7 @@ Vérifiez que le backend tourne et que votre modèle comprend la syntaxe `[EXEC:
 ### Mise à jour de l'application
 
 ```bash
-cd ~/Documents/Github/mi-saina
+cd mi-saina
 git pull
 bash install.sh   # Ré-exécuter pour mettre à jour les dépendances
 ```
