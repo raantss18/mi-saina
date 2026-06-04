@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface ShellEntry {
   command?: string;
   content: string;
   shellStreaming?: boolean;
   shellDone?: boolean;
+  waitingInput?: boolean;
   returncode?: number;
   error?: string;
 }
@@ -22,19 +23,26 @@ const STATUS_META: Record<TaskStatus, { label: string; color: string; icon: stri
 };
 
 export default function TerminalPanel({
-  entries, taskStatus, onClose,
+  entries, taskStatus, onClose, onInput,
 }: {
   entries: ShellEntry[];
   taskStatus: TaskStatus;
   onClose: () => void;
+  onInput?: (text: string) => void;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [inputVal, setInputVal] = useState("");
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [entries, taskStatus]);
 
   const meta = STATUS_META[taskStatus];
+  // Une commande attend-elle une saisie (prompt [Y/n], etc.) ?
+  const active = entries.find(e => e.shellStreaming && !e.shellDone);
+  const awaiting = entries.some(e => e.waitingInput && !e.shellDone);
+
+  const send = () => { onInput?.(inputVal); setInputVal(""); };
 
   return (
     <div style={{
@@ -102,6 +110,32 @@ export default function TerminalPanel({
           );
         })}
       </div>
+
+      {/* Saisie interactive : répondre aux prompts (mot de passe via la fenêtre dédiée) */}
+      {onInput && active && (
+        <div style={{
+          borderTop: `1px solid ${awaiting ? "var(--accent)" : "var(--border)"}`,
+          padding: "6px 10px", display: "flex", gap: 6, alignItems: "center",
+          background: awaiting ? "rgba(88,166,255,0.08)" : "var(--surface)",
+        }}>
+          <span style={{ color: "var(--accent)", fontSize: 12 }}>›</span>
+          <input
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); send(); } }}
+            placeholder={awaiting ? "Le processus attend une réponse (ex: y, n, Entrée)…" : "Entrée pour le processus…"}
+            autoFocus={awaiting}
+            style={{
+              flex: 1, background: "transparent", border: "none", outline: "none",
+              color: "var(--text)", fontSize: 12, fontFamily: "monospace",
+            }}
+          />
+          <button onClick={send}
+            style={{ background: "var(--accent)", border: "none", color: "#000", padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+            ↵
+          </button>
+        </div>
+      )}
     </div>
   );
 }

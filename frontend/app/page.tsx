@@ -48,6 +48,7 @@ export default function Home() {
   const [sudoPassword, setSudoPassword] = useState("");
   const [pendingCommand, setPendingCommand] = useState("");
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<{ label: string; message: string; fix: string | null } | null>(null);
   const [showTerminal, setShowTerminal] = useState(false);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const turnFailureRef = useRef(false);
@@ -193,6 +194,12 @@ export default function Home() {
         return;
       }
 
+      // Vigilance : un problème connu détecté dans la sortie du terminal
+      if (data.type === "diagnostic") {
+        setDiagnostic({ label: data.label, message: data.message, fix: data.fix ?? null });
+        return;
+      }
+
       // Demande de validation avant exécution d'une commande
       if (data.type === "confirm_exec") {
         setConfirmCommand(data.command);
@@ -297,6 +304,15 @@ export default function Home() {
   const respondConfirm = (approved: boolean) => {
     wsRef.current?.send(JSON.stringify({ type: "exec_response", approved }));
     setConfirmCommand(null);
+  };
+
+  // Diagnostic : arrêter le processus en cours puis lancer la correction proposée
+  const applyDiagnosticFix = () => {
+    const fix = diagnostic?.fix;
+    setDiagnostic(null);
+    if (!fix) return;
+    stopGeneration();
+    setTimeout(() => sendMessage(`Exécute exactement cette commande corrective : ${fix}`), 900);
   };
 
   const handleSudoSubmit = () => {
@@ -429,6 +445,39 @@ export default function Home() {
           </div>
         )}
 
+        {/* Vigilance : diagnostic détecté dans la sortie du terminal */}
+        {diagnostic && (
+          <div style={{
+            flexShrink: 0, margin: "8px 20px", padding: "10px 14px",
+            background: "rgba(210,153,34,0.10)", border: "1px solid var(--yellow)",
+            borderRadius: 8, fontSize: 12, color: "var(--text)",
+          }}>
+            <div style={{ fontWeight: 700, color: "var(--yellow)", marginBottom: 4 }}>
+              ⚠️ {diagnostic.label}
+            </div>
+            <div style={{ color: "var(--text-muted)", marginBottom: diagnostic.fix ? 8 : 0 }}>
+              {diagnostic.message}
+            </div>
+            {diagnostic.fix && (
+              <code style={{ display: "block", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "6px 8px", marginBottom: 8, color: "var(--text)", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                $ {diagnostic.fix}
+              </code>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setDiagnostic(null)}
+                style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                Ignorer
+              </button>
+              {diagnostic.fix && (
+                <button onClick={applyDiagnosticFix}
+                  style={{ background: "var(--yellow)", border: "none", color: "#000", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                  Arrêter et corriger
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Chat + Terminal (panneau optionnel à côté) */}
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -439,6 +488,7 @@ export default function Home() {
               entries={messages.filter(m => m.role === "shell")}
               taskStatus={taskStatus}
               onClose={() => setShowTerminal(false)}
+              onInput={sendShellInput}
             />
           )}
         </div>

@@ -16,6 +16,8 @@ from services.memory import (
 from services.shell_exec import execute_command
 from services.shell_stream import stream_pty
 from services.planner import should_plan, plan_task, fit_budget
+from services import diagnostics
+from services.sysinfo import system_block
 
 router = APIRouter()
 
@@ -27,9 +29,9 @@ _DEFAULT_SYSTEM = "Tu es mi-saina, un assistant IA local expert avec accès comp
 
 
 def _load_system_prompt() -> str:
-    if SYSTEM_PROMPT_FILE.exists():
-        return SYSTEM_PROMPT_FILE.read_text()
-    return _DEFAULT_SYSTEM
+    base = SYSTEM_PROMPT_FILE.read_text() if SYSTEM_PROMPT_FILE.exists() else _DEFAULT_SYSTEM
+    # Infos matériel/distribution détectées à l'exécution (jamais versionnées)
+    return f"{base}\n\n{system_block()}"
 
 
 def _build_messages(history, user_input, memory_context, attachments=None):
@@ -98,25 +100,33 @@ async def _ws_reader(websocket: WebSocket, queue: asyncio.Queue):
 
 
 async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queue,
-                          sudo_password: str | None = None) -> tuple[str, int]:
+                          sudo_password: str | None = None,
+                          _started: bool = False) -> tuple[str, int, bool]:
     """Lance cmd en PTY, stream la sortie via WS, route stdin depuis ws_queue.
 
     Retourne (sortie_capturée, returncode) pour permettre à la boucle agentique
     de renvoyer le résultat au modèle (find → ouvrir, etc.).
+    `_started` : interne — évite de recréer un bloc terminal lors du relancement sudo.
     """
 
     if not cmd.strip():
-        return "", 0
+        return "", 0, False
 
     captured: list[str] = []
     returncode = -1
+    stopped = False
+    diag_buffer = ""           # fenêtre glissante pour la vigilance temps réel
+    diag_seen: set[str] = set()
 
-    await websocket.send_text(json.dumps({"type": "shell_start", "command": cmd}))
+    # Un seul bloc terminal, même après saisie du mot de passe sudo (pas de doublon)
+    if not _started:
+        await websocket.send_text(json.dumps({"type": "shell_start", "command": cmd}))
 
     # Queues dédiées : stdin interactif du PTY et réponse au prompt sudo.
     # Séparer la réponse sudo évite que _route_stdin "mange" le mot de passe.
     stdin_q: asyncio.Queue[str] = asyncio.Queue()
     sudo_q: asyncio.Queue[dict] = asyncio.Queue()
+    stop_event = asyncio.Event()   # « stop » → tue le processus du terminal
 
     # Tâche qui draine ws_queue pour router shell_stdin / sudo_response pendant l'exécution
     async def _route_stdin():
@@ -124,6 +134,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
             try:
                 raw = await asyncio.wait_for(ws_queue.get(), timeout=0.2)
                 if raw is None:
+                    stop_event.set()
                     return
                 p = json.loads(raw)
                 if p.get("type") == "shell_stdin":
@@ -131,6 +142,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                 elif p.get("type") == "sudo_response":
                     await sudo_q.put(p)
                 elif p.get("type") == "stop":
+                    stop_event.set()    # signale stream_pty pour tuer le process
                     return
                 # Les autres messages (chat normal) sont ignorés pendant l'exécution
                 # (ils seront redemandés par l'utilisateur après)
@@ -144,7 +156,8 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
     routing_task = asyncio.create_task(_route_stdin())
 
     try:
-        async for event in stream_pty(cmd, sudo_password=sudo_password, stdin_queue=stdin_q):
+        async for event in stream_pty(cmd, sudo_password=sudo_password,
+                                      stdin_queue=stdin_q, stop_event=stop_event):
 
             if event["type"] == "needs_sudo":
                 # Demander le mot de passe au frontend.
@@ -155,13 +168,14 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                     # Relancer avec le mot de passe (le routing actuel est arrêté
                     # puis recréé par l'appel récursif).
                     routing_task.cancel()
-                    return await _exec_streaming(cmd, websocket, ws_queue, p.get("password"))
+                    return await _exec_streaming(cmd, websocket, ws_queue,
+                                                 p.get("password"), _started=True)
                 except asyncio.TimeoutError:
                     await websocket.send_text(json.dumps({
                         "type": "shell_done", "command": cmd, "returncode": -1,
                         "error": "Timeout — mot de passe non fourni"
                     }))
-                return "", -1
+                return "", -1, False
 
             elif event["type"] == "chunk":
                 captured.append(event["text"])
@@ -170,6 +184,16 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                     "command": cmd,
                     "text": event["text"],
                 }))
+                # ── Vigilance temps réel : détecter un problème connu dans la sortie ──
+                diag_buffer = (diag_buffer + event["text"])[-1000:]
+                for d in diagnostics.diagnose(diag_buffer):
+                    if d["label"] in diag_seen:
+                        continue
+                    diag_seen.add(d["label"])
+                    await websocket.send_text(json.dumps({
+                        "type": "diagnostic", "command": cmd,
+                        "label": d["label"], "message": d["message"], "fix": d["fix"],
+                    }))
 
             elif event["type"] == "waiting":
                 # Le processus attend une entrée — signaler au frontend
@@ -203,7 +227,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
         except asyncio.CancelledError:
             pass
 
-    return "".join(captured), returncode
+    return "".join(captured), returncode, stop_event.is_set()
 
 
 _MAX_FEEDBACK_CHARS = 4000  # tronquage de la sortie renvoyée au modèle
@@ -234,12 +258,17 @@ async def _await_confirm(cmd: str, websocket: WebSocket, queue: asyncio.Queue) -
 def _format_exec_feedback(results: list[tuple[str, str, int]]) -> str:
     """Met en forme la sortie des commandes pour la renvoyer au modèle."""
     parts = []
+    diags: list[dict] = []
     for cmd, out, rc in results:
         out = out.strip()
+        diags += diagnostics.diagnose(out)
         if len(out) > _MAX_FEEDBACK_CHARS:
             out = out[:_MAX_FEEDBACK_CHARS] + "\n[…sortie tronquée…]"
         parts.append(f"$ {cmd}\n(code retour: {rc})\n{out or '(aucune sortie)'}")
     body = "\n\n".join(parts)
+    diag_text = diagnostics.format_for_model(diags)
+    if diag_text:
+        body += "\n\n" + diag_text
     return (
         "[RÉSULTAT DES COMMANDES EXÉCUTÉES]\n" + body +
         "\n\n[INSTRUCTION] Au vu de ces résultats, poursuis la tâche. S'il reste une "
@@ -352,10 +381,15 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 results.append((cmd, "(commande refusée par l'utilisateur)", -1))
                 declined = True
                 continue
-            out, rc = await _exec_streaming(cmd, websocket, queue)
+            out, rc, was_stopped = await _exec_streaming(cmd, websocket, queue)
             results.append((cmd, out, rc))
+            if was_stopped:
+                # L'utilisateur a coupé l'exécution → on arrête toute la tâche
+                stopped = True
+                await websocket.send_text(json.dumps({"type": "stopped"}))
+                break
 
-        if step == settings.MAX_AGENT_STEPS - 1 or declined:
+        if stopped or step == settings.MAX_AGENT_STEPS - 1 or declined:
             break
 
         messages.append({"role": "user", "content": _format_exec_feedback(results)})

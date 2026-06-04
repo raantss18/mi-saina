@@ -21,6 +21,7 @@ import os
 import pty
 import re
 import shlex
+import signal
 import struct
 import termios
 
@@ -281,6 +282,7 @@ async def stream_pty(
     cols: int = 120,
     rows: int = 40,
     stdin_queue: asyncio.Queue | None = None,
+    stop_event: asyncio.Event | None = None,
 ):
     """
     Exécute cmd dans un PTY et yield des événements :
@@ -377,6 +379,30 @@ async def stream_pty(
         while True:
             await asyncio.sleep(0.04)
             elapsed += 0.04
+
+            # ── Arrêt demandé par l'utilisateur ────────────────────────
+            if stop_event is not None and stop_event.is_set():
+                # Ctrl+C via le PTY → SIGINT au groupe au premier plan
+                # (arrête proprement paru/pacman, y compris leurs enfants root)
+                try:
+                    os.write(master, b"\x03")
+                except OSError:
+                    pass
+                yield {"type": "chunk", "text": "\n[⏹ Arrêté par l'utilisateur]\n"}
+                # laisser une chance de s'arrêter proprement, sinon forcer
+                for _ in range(15):
+                    await asyncio.sleep(0.1)
+                    if proc.returncode is not None:
+                        break
+                if proc.returncode is None:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except Exception:
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+                break
 
             if elapsed > timeout:
                 try:

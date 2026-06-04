@@ -35,12 +35,14 @@ bash install.sh
 ```
 
 L'installeur :
-1. Vérifie/installe Python 3, Node.js, Git
+1. **Détecte ta distribution** (Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine) et installe Python 3, Node.js, Git avec le bon gestionnaire de paquets
 2. Installe et configure Ollama
-3. Télécharge le modèle par défaut (`qwen3.5:9b`)
+3. **Détecte ton matériel (RAM/VRAM)** et te propose le modèle idéal — Qwen, DeepSeek ou Gemma (taille adaptée à ta machine)
 4. Crée le venv Python et installe les dépendances
 5. Installe les dépendances Node.js
 6. Configure les services systemd (démarrage automatique au boot)
+
+> mi-saina s'adapte ensuite **automatiquement à ta distribution** : le matériel et les commandes du gestionnaire de paquets (mise à jour, installation…) sont détectés à l'exécution et fournis au modèle.
 
 ## Installation manuelle (étape par étape)
 
