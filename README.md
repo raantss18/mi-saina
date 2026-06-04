@@ -138,7 +138,8 @@ Tapez `/` dans le champ pour voir les skills disponibles :
 | `/git` | Statut git du répertoire courant |
 | `/top` | Processus les plus gourmands |
 | `/net` | État réseau |
-| `/pkg` | Mises à jour disponibles |
+| `/pkg` | Mises à jour disponibles (sans installer) |
+| `/update` | Mise à jour complète du système (`paru -Syu`) |
 | `/explain` | Explique la dernière commande |
 
 Créez vos propres skills dans **⚙ Config → Skills**.
@@ -149,9 +150,17 @@ L'assistant peut exécuter des commandes directement sur votre machine. Il utili
 
 **Exemples :**
 - *"Crée un dossier projet dans mon home"*
-- *"Met à jour mon système"* (demandera le mot de passe sudo)
+- *"Met à jour mon système"* (lance `paru -Syu`)
 - *"Montre-moi l'utilisation disque"*
 - *"Clone ce dépôt git et installe ses dépendances"*
+
+### Commandes root (sudo / pacman / paru)
+
+mi-saina cible **EndeavourOS / Arch** : il utilise `pacman` et `paru` (jamais `apt`/`dnf`).
+
+Quand une commande nécessite les droits root (`paru`, `sudo pacman -S`, `systemctl enable`…), l'interface ouvre une fenêtre **mot de passe sudo**. Le mot de passe n'est jamais stocké : il est injecté à la volée uniquement au moment où sudo l'affiche (`[sudo] password for …`), ce qui fonctionne aussi pour `paru` (qui escalade lui-même via sudo).
+
+Les confirmations `[Y/n]` restent **interactives** : elles s'affichent dans le bloc terminal et vous répondez via le champ de saisie. mi-saina n'ajoute jamais `--noconfirm`, et ne lance jamais `paru`/`yay` avec `sudo` (ces outils refusent de tourner en root).
 
 ## Structure du projet
 

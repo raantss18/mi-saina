@@ -1,0 +1,1 @@
+{"name":"vm","trigger":"/vm","description":"Lister les machines virtuelles","icon":"🖥️","prompt":"Liste mes machines virtuelles libvirt (lecture seule). Pour en démarrer une, propose-moi d'ouvrir virt-manager :\n[EXEC: virsh -c qemu:///system list --all 2>/dev/null]"}

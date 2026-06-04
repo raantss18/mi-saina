@@ -40,3 +40,6 @@ backend/data/sessions.db
 # OS
 .DS_Store
 Thumbs.db
+
+# Notes de travail locales (non publiées)
+TODO.md

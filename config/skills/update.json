@@ -1,0 +1,1 @@
+{"name":"update","trigger":"/update","description":"Mettre à jour le système (dépôts + AUR via paru)","icon":"⬆️","prompt":"Mets à jour l'ensemble du système (paquets officiels et AUR). L'interface me demandera mon mot de passe sudo, et je dois pouvoir valider le [Y/n] :\n[EXEC: paru -Syu]"}

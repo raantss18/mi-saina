@@ -8,7 +8,7 @@ import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
 
 interface Message {
-  role: "user" | "assistant" | "shell";
+  role: "user" | "assistant" | "shell" | "plan";
   content: string;
   shellStreaming?: boolean;
   shellDone?: boolean;
@@ -46,6 +46,7 @@ export default function Home() {
   const [sudoModal, setSudoModal] = useState(false);
   const [sudoPassword, setSudoPassword] = useState("");
   const [pendingCommand, setPendingCommand] = useState("");
+  const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -172,6 +173,35 @@ export default function Home() {
         return;
       }
 
+      // Plan généré (tâche découpée en sous-tâches)
+      if (data.type === "plan") {
+        const list = (data.subtasks as string[]).map((s, i) => `${i + 1}. ${s}`).join("\n");
+        setMessages(prev => [...prev, { role: "plan", content: `🧭 Plan (${data.subtasks.length} étapes)\n${list}` }]);
+        return;
+      }
+
+      // Début d'une sous-tâche
+      if (data.type === "subtask_start") {
+        setMessages(prev => [...prev, { role: "plan", content: `▶ Étape ${data.index}/${data.total} — ${data.text}` }]);
+        return;
+      }
+
+      // Demande de validation avant exécution d'une commande
+      if (data.type === "confirm_exec") {
+        setConfirmCommand(data.command);
+        return;
+      }
+
+      // L'utilisateur a refusé une commande → trace dans le fil
+      if (data.type === "exec_declined") {
+        setMessages(prev => [...prev, {
+          role: "shell", command: data.command,
+          content: "⏭ Commande refusée — non exécutée.",
+          shellDone: true, shellStreaming: false, returncode: -1,
+        }]);
+        return;
+      }
+
       if (data.type === "session_title") {
         // Rafraîchir le panel sessions pour afficher le nouveau titre
         setMemoryRefresh(n => n + 1);
@@ -237,6 +267,11 @@ export default function Home() {
   const copyLastResponse = () => {
     const last = [...messages].reverse().find(m => m.role === "assistant");
     if (last) navigator.clipboard.writeText(last.content);
+  };
+
+  const respondConfirm = (approved: boolean) => {
+    wsRef.current?.send(JSON.stringify({ type: "exec_response", approved }));
+    setConfirmCommand(null);
   };
 
   const handleSudoSubmit = () => {
@@ -500,6 +535,27 @@ export default function Home() {
               <button onClick={handleSudoSubmit}
                 style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmCommand !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24, minWidth: 380, maxWidth: 640 }}>
+            <div style={{ color: "var(--accent)", marginBottom: 8, fontSize: 13, fontWeight: 700 }}>▶ Exécuter cette commande ?</div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: "8px 10px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+              <code style={{ color: "var(--text)" }}>$ {confirmCommand}</code>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => respondConfirm(false)} autoFocus
+                style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                Refuser
+              </button>
+              <button onClick={() => respondConfirm(true)}
+                style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                Exécuter
               </button>
             </div>
           </div>

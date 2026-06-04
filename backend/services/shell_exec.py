@@ -1,8 +1,16 @@
 import asyncio
 import os
 import re
+import shlex
 
 from config import settings
+# Détection root / nettoyage partagés avec le chemin streaming (PTY)
+from services.shell_stream import (
+    needs_root as needs_sudo,
+    sanitize,
+    _is_aur_helper,
+    _strip_leading_sudo,
+)
 
 DANGEROUS_PATTERNS = [
     r"rm\s+-rf\s+/",
@@ -17,12 +25,6 @@ def is_dangerous(cmd: str) -> bool:
     return any(re.search(p, cmd) for p in DANGEROUS_PATTERNS)
 
 
-def needs_sudo(cmd: str) -> bool:
-    return cmd.strip().startswith("sudo") or any(
-        kw in cmd for kw in ["pacman -S", "systemctl enable", "chmod 777", "chown root"]
-    )
-
-
 async def execute_command(cmd: str, sudo_password: str | None = None) -> dict:
     if is_dangerous(cmd):
         return {"status": "blocked", "output": "Commande bloquée : pattern dangereux détecté."}
@@ -31,10 +33,15 @@ async def execute_command(cmd: str, sudo_password: str | None = None) -> dict:
         return {"status": "needs_sudo", "output": "Cette commande requiert le mot de passe root."}
 
     env = os.environ.copy()
-    actual_cmd = cmd
+    actual_cmd = sanitize(cmd)
     if sudo_password and needs_sudo(cmd):
-        clean = cmd.lstrip("sudo").strip()
-        actual_cmd = f"echo {repr(sudo_password)} | sudo -S {clean}"
+        pw = shlex.quote(sudo_password)
+        if _is_aur_helper(cmd):
+            # Les aides AUR refusent sudo : amorcer le timestamp sudo puis lancer telle quelle.
+            actual_cmd = f"echo {pw} | sudo -S -v && {sanitize(cmd)}"
+        else:
+            clean = _strip_leading_sudo(sanitize(cmd))
+            actual_cmd = f"echo {pw} | sudo -S {clean}"
 
     try:
         proc = await asyncio.create_subprocess_shell(

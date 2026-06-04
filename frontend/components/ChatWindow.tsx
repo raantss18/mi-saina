@@ -171,7 +171,7 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
       {messages.length === 0 && (
         <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", marginTop: 60 }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>◈</div>
-          <div>LocalMind prêt</div>
+          <div>mi-saina prêt</div>
           <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
             Commandes exécutées en direct — sortie en temps réel, prompts interactifs
           </div>
@@ -186,6 +186,20 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
               msg={msg}
               onInput={onShellInput}
             />
+          );
+        }
+
+        if (msg.role === "plan") {
+          return (
+            <div key={i} style={{
+              alignSelf: "center", maxWidth: "92%", width: "100%",
+              background: "rgba(88,166,255,0.06)", border: "1px dashed var(--accent)",
+              borderRadius: 8, padding: "8px 12px", margin: "2px 0",
+              fontSize: 12, color: "var(--text-muted)", whiteSpace: "pre-wrap",
+              fontFamily: "var(--font-mono, monospace)",
+            }}>
+              {msg.content}
+            </div>
           );
         }
 

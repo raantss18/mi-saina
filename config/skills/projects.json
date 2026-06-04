@@ -1,0 +1,1 @@
+{"name":"projects","trigger":"/projects","description":"Lister mes projets GitHub locaux","icon":"📂","prompt":"Liste mes projets locaux et propose d'en ouvrir un dans kate :\n[EXEC: ls -1 ~/Documents/GitHub 2>/dev/null]"}

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routers import chat, shell, search, memory as memory_router, models as models_router, config_router
 
-app = FastAPI(title="LocalMind API", version="1.0.0")
+app = FastAPI(title="mi-saina API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
