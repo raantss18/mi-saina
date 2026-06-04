@@ -14,6 +14,13 @@ interface SearchResult {
   score: number;
 }
 
+interface HistResult {
+  session_id: string;
+  title: string;
+  role: string;
+  snippet: string;
+}
+
 interface Props {
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
@@ -26,6 +33,8 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [histQuery, setHistQuery] = useState("");
+  const [histResults, setHistResults] = useState<HistResult[]>([]);
 
   const fetchSessions = async () => {
     try {
@@ -54,6 +63,15 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
     if (!confirm("Supprimer cette session ?")) return;
     await fetch(`http://localhost:8000/memory/sessions/${id}`, { method: "DELETE" });
     fetchSessions();
+  };
+
+  const handleHistSearch = async () => {
+    const q = histQuery.trim();
+    if (!q) { setHistResults([]); return; }
+    try {
+      const res = await fetch(`http://localhost:8000/memory/history-search?q=${encodeURIComponent(q)}`);
+      if (res.ok) setHistResults(await res.json());
+    } catch {}
   };
 
   const handleSearch = async () => {
@@ -133,6 +151,46 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
             </button>
           </div>
         ))}
+      </div>
+
+      <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>RECHERCHE DANS L'HISTORIQUE</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          <input
+            value={histQuery}
+            onChange={e => setHistQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleHistSearch()}
+            placeholder="Mot-clé dans tes anciens chats…"
+            style={{
+              flex: 1, background: "var(--bg)", border: "1px solid var(--border)",
+              color: "var(--text)", padding: "4px 6px", borderRadius: 4, fontSize: 11, outline: "none",
+            }}
+          />
+          <button onClick={handleHistSearch}
+            style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "4px 8px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+            🔍
+          </button>
+        </div>
+        {histResults.length > 0 && (
+          <div style={{ marginTop: 6, maxHeight: 180, overflowY: "auto" }}>
+            {histResults.map((r, i) => (
+              <div key={i}
+                onClick={() => onSelectSession(r.session_id)}
+                title="Ouvrir cette conversation"
+                style={{
+                  padding: "4px 6px", marginBottom: 4, cursor: "pointer",
+                  background: "var(--bg)", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10,
+                }}>
+                <div style={{ color: "var(--accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.title}
+                </div>
+                <div style={{ color: "var(--text-muted)", marginTop: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                  {r.snippet}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>

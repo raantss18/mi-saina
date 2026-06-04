@@ -49,6 +49,7 @@ export default function Home() {
   const [pendingCommand, setPendingCommand] = useState("");
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<{ label: string; message: string; fix: string | null } | null>(null);
+  const [skillSuggestion, setSkillSuggestion] = useState<{ name: string; description: string; commands: string[] } | null>(null);
   const [showTerminal, setShowTerminal] = useState(false);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const turnFailureRef = useRef(false);
@@ -194,6 +195,12 @@ export default function Home() {
         return;
       }
 
+      // Compétence apprise : proposer d'enregistrer la tâche réussie
+      if (data.type === "skill_suggestion") {
+        setSkillSuggestion({ name: data.name, description: data.description, commands: data.commands || [] });
+        return;
+      }
+
       // Vigilance : un problème connu détecté dans la sortie du terminal
       if (data.type === "diagnostic") {
         setDiagnostic({ label: data.label, message: data.message, fix: data.fix ?? null });
@@ -304,6 +311,21 @@ export default function Home() {
   const respondConfirm = (approved: boolean) => {
     wsRef.current?.send(JSON.stringify({ type: "exec_response", approved }));
     setConfirmCommand(null);
+  };
+
+  // Enregistrer la tâche réussie comme compétence réutilisable (/slash)
+  const saveSkill = async () => {
+    const s = skillSuggestion;
+    setSkillSuggestion(null);
+    if (!s) return;
+    const prompt = `Refais cette tâche : ${s.description}\n\nCommandes de référence (adapte-les au contexte) :\n${s.commands.map(c => `[EXEC: ${c}]`).join("\n")}`;
+    try {
+      await fetch("http://localhost:8000/config/skills", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: s.name, trigger: `/${s.name}`, description: s.description, icon: "💾", prompt }),
+      });
+      fetch("http://localhost:8000/config/skills").then(r => r.json()).then(setSkills).catch(() => {});
+    } catch { /* backend indisponible */ }
   };
 
   // Diagnostic : arrêter le processus en cours puis lancer la correction proposée
@@ -474,6 +496,32 @@ export default function Home() {
                   Arrêter et corriger
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Compétence apprise : proposition d'enregistrement */}
+        {skillSuggestion && (
+          <div style={{
+            flexShrink: 0, margin: "8px 20px", padding: "10px 14px",
+            background: "rgba(63,185,80,0.10)", border: "1px solid var(--green)",
+            borderRadius: 8, fontSize: 12, color: "var(--text)",
+          }}>
+            <div style={{ fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>
+              💾 Enregistrer comme compétence ?
+            </div>
+            <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>
+              Réutilisable via <code style={{ color: "var(--text)" }}>/{skillSuggestion.name}</code> · {skillSuggestion.commands.length} commande(s) : {skillSuggestion.description}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setSkillSuggestion(null)}
+                style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                Ignorer
+              </button>
+              <button onClick={saveSkill}
+                style={{ background: "var(--green)", border: "none", color: "#000", padding: "5px 12px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                Enregistrer
+              </button>
             </div>
           </div>
         )}

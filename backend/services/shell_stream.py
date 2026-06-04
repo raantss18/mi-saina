@@ -74,6 +74,27 @@ def _is_dangerous(cmd: str) -> bool:
     return any(re.search(p, cmd) for p in DANGEROUS_PATTERNS)
 
 
+# Commandes AUTORISÉES mais IRRÉVERSIBLES → confirmation demandée (mode « risky »)
+DESTRUCTIVE_PATTERNS = [
+    r"\brm\b", r"\brmdir\b", r"\bshred\b", r"\bunlink\b",
+    r"\bdd\b\s+.*\b(of|if)=", r"\bmkfs", r"\btruncate\b", r"\bmkswap\b",
+    r"\b(fdisk|parted|wipefs|sgdisk|cfdisk)\b",
+    r"\b(kill|pkill|killall)\b",
+    r"git\s+reset\s+--hard", r"git\s+clean\s+-[a-zA-Z]*f", r"git\s+checkout\s+--\s",
+    r"git\s+push\s+.*(--force\b|-f\b)",
+    r"\bchmod\s+-R\b", r"\bchown\s+-R\b",
+    r">\s*/dev/(sd|nvme|vd|mmcblk)",
+    r":\(\)\s*\{",                      # fork bomb
+    r"\bmv\b\s+.*\s+/(etc|usr|bin|boot|lib|sbin)\b",
+    r"\b(userdel|groupdel)\b",
+]
+
+
+def is_destructive(cmd: str) -> bool:
+    """La commande est-elle irréversible/risquée (à confirmer même si non-root) ?"""
+    return any(re.search(p, cmd, re.IGNORECASE) for p in DESTRUCTIVE_PATTERNS)
+
+
 def _strip_leading_sudo(cmd: str) -> str:
     return re.sub(r'^\s*sudo\s+', '', cmd.strip())
 

@@ -4,6 +4,16 @@ Toutes les évolutions notables de **mi-saina** sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 versionnage [SemVer](https://semver.org/lang/fr/).
 
+## [1.4.0] - 2026-06-04
+
+### Ajouté
+- **Compétences apprises** (inspiré de hermes-agent, adapté local) : après une tâche réussie (≥2 commandes exécutées avec succès), mi-saina propose de l'enregistrer comme **compétence réutilisable** (`/slash`) construite à partir des commandes. Réutilisable ensuite depuis le menu des skills.
+- **Recherche plein-texte de l'historique (SQLite FTS5)** : section « Recherche dans l'historique » du panneau sessions — retrouve une ancienne conversation par mot-clé (extraits surlignés) et l'ouvre d'un clic. Vient compléter la recherche sémantique.
+- Analyse de hermes-agent et feuille de route (TODO) des fonctionnalités à reprendre en restant **local & simple**.
+
+### Modifié
+- **Confirmation allégée** (`CONFIRM_MODE`) : par défaut `risky` — la fenêtre Exécuter/Refuser n'apparaît plus que pour les commandes **destructrices/irréversibles** (rm, dd, mkfs, kill, git reset --hard, push --force…). Les commandes root restent validées par le mot de passe sudo (plus de double pop-up). Modes : `risky` / `all` / `never`.
+
 ## [1.3.0] - 2026-06-04
 
 ### Ajouté

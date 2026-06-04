@@ -13,8 +13,12 @@ class Settings(BaseSettings):
     PORT: int = 8000
     MAX_SEARCH_RESULTS: int = 5
     SHELL_TIMEOUT: int = 30
-    # Demander une confirmation (Exécuter/Refuser) avant CHAQUE commande [EXEC:]
-    CONFIRM_BEFORE_EXEC: bool = True
+    # Quand demander la confirmation Exécuter/Refuser avant une commande :
+    #   "risky"  → seulement les commandes destructrices (rm, dd, kill, git reset --hard…)
+    #   "all"    → avant chaque commande
+    #   "never"  → jamais
+    # (les commandes root demandent de toute façon le mot de passe sudo = validation)
+    CONFIRM_MODE: str = "risky"
     # Nb max d'allers-retours modèle ↔ commandes par requête (boucle agentique)
     MAX_AGENT_STEPS: int = 6
 

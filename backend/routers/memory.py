@@ -1,7 +1,10 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from services.memory import create_session, list_sessions, get_session_messages, delete_session, search_memory
+from services.memory import (
+    create_session, list_sessions, get_session_messages, delete_session,
+    search_memory, search_history,
+)
 
 router = APIRouter()
 
@@ -40,3 +43,9 @@ def remove_session(session_id: str):
 @router.post("/search")
 def semantic_search(body: SearchQuery):
     return search_memory(body.query, body.top_k)
+
+
+@router.get("/history-search")
+def history_search(q: str):
+    """Recherche plein-texte (FTS5) dans tout l'historique des conversations."""
+    return search_history(q)

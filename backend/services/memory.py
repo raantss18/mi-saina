@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -56,6 +57,62 @@ class Message(Base):
 
 
 Base.metadata.create_all(engine)
+
+
+# ── Recherche plein-texte (SQLite FTS5) ────────────────────────────────────────
+def _init_fts() -> None:
+    """Crée l'index FTS5 sur le contenu des messages + triggers de synchro."""
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts "
+                "USING fts5(content, content='messages', content_rowid='rowid')")
+            conn.exec_driver_sql(
+                "CREATE TRIGGER IF NOT EXISTS messages_ai AFTER INSERT ON messages BEGIN "
+                "INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END")
+            conn.exec_driver_sql(
+                "CREATE TRIGGER IF NOT EXISTS messages_ad AFTER DELETE ON messages BEGIN "
+                "INSERT INTO messages_fts(messages_fts, rowid, content) "
+                "VALUES('delete', old.rowid, old.content); END")
+            conn.exec_driver_sql(
+                "CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN "
+                "INSERT INTO messages_fts(messages_fts, rowid, content) "
+                "VALUES('delete', old.rowid, old.content); "
+                "INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END")
+            # (Re)construction de l'index depuis la table source (table à contenu externe).
+            # Idempotent et peu coûteux à notre échelle ; les triggers assurent ensuite la synchro.
+            conn.exec_driver_sql("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
+    except Exception:
+        pass   # FTS5 indisponible → la recherche plein-texte sera simplement vide
+
+
+_init_fts()
+
+
+def search_history(query: str, limit: int = 25) -> list[dict]:
+    """Recherche plein-texte dans l'historique. Retourne des sessions + extraits."""
+    terms = re.findall(r"\w+", query or "", flags=re.UNICODE)
+    if not terms:
+        return []
+    fts_query = " ".join(f'"{t}"' for t in terms)   # littéral, évite la syntaxe FTS
+    try:
+        with engine.begin() as conn:
+            rows = conn.exec_driver_sql(
+                "SELECT m.session_id, s.title, m.role, "
+                "snippet(messages_fts, 0, '«', '»', '…', 10) AS snip "
+                "FROM messages_fts f "
+                "JOIN messages m ON m.rowid = f.rowid "
+                "LEFT JOIN sessions s ON s.id = m.session_id "
+                "WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
+                (fts_query, limit)).fetchall()
+    except Exception:
+        return []
+    out, seen = [], set()
+    for session_id, title, role, snip in rows:
+        out.append({"session_id": session_id, "title": title or "Sans titre",
+                    "role": role, "snippet": snip})
+        seen.add(session_id)
+    return out
 
 
 # ── CRUD sessions ─────────────────────────────────────────────────────────────

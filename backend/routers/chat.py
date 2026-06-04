@@ -14,7 +14,7 @@ from services.memory import (
     update_session_title, session_message_count,
 )
 from services.shell_exec import execute_command
-from services.shell_stream import stream_pty
+from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget
 from services import diagnostics
 from services.sysinfo import system_block
@@ -233,6 +233,13 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
 _MAX_FEEDBACK_CHARS = 4000  # tronquage de la sortie renvoyée au modèle
 
 
+def _slugify(text: str, max_words: int = 4) -> str:
+    """Nom court (kebab-case) pour une compétence, dérivé de la demande."""
+    words = re.findall(r"[a-zA-Z0-9]+", text.lower())[:max_words]
+    slug = "-".join(words)[:32].strip("-")
+    return slug or "tache"
+
+
 async def _await_confirm(cmd: str, websocket: WebSocket, queue: asyncio.Queue) -> bool:
     """Demande à l'utilisateur d'approuver une commande avant de l'exécuter.
 
@@ -347,14 +354,15 @@ async def chat_complete(body: ChatRequest):
 
 async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
-                          persist: bool = True) -> tuple[bool, str]:
+                          persist: bool = True) -> tuple[bool, str, list[tuple[str, int]]]:
     """Boucle agentique sur `messages` (modèle → commandes → résultat → modèle).
 
-    Retourne (stoppé, dernière_réponse). `persist=False` pour un sous-agent à
-    contexte éphémère (on n'enregistre pas ses réponses en base).
+    Retourne (stoppé, dernière_réponse, commandes_exécutées[(cmd, rc)]).
+    `persist=False` pour un sous-agent à contexte éphémère.
     """
     stopped = False
     last = ""
+    executed: list[tuple[str, int]] = []
     for step in range(settings.MAX_AGENT_STEPS):
         full_response, stopped = await _stream_llm(messages, task_type, websocket, queue)
         last = full_response
@@ -376,13 +384,18 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
         results: list[tuple[str, str, int]] = []
         declined = False
         for cmd in cmds:
-            if settings.CONFIRM_BEFORE_EXEC and not await _await_confirm(cmd, websocket, queue):
+            # Confirmation selon le mode : jamais / tout / seulement les commandes risquées.
+            # (Les commandes root sont de toute façon validées par le mot de passe sudo.)
+            need_confirm = settings.CONFIRM_MODE == "all" or (
+                settings.CONFIRM_MODE == "risky" and is_destructive(cmd))
+            if need_confirm and not await _await_confirm(cmd, websocket, queue):
                 await websocket.send_text(json.dumps({"type": "exec_declined", "command": cmd}))
                 results.append((cmd, "(commande refusée par l'utilisateur)", -1))
                 declined = True
                 continue
             out, rc, was_stopped = await _exec_streaming(cmd, websocket, queue)
             results.append((cmd, out, rc))
+            executed.append((cmd, rc))
             if was_stopped:
                 # L'utilisateur a coupé l'exécution → on arrête toute la tâche
                 stopped = True
@@ -394,7 +407,7 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
 
         messages.append({"role": "user", "content": _format_exec_feedback(results)})
 
-    return stopped, last
+    return stopped, last, executed
 
 
 @router.websocket("/ws")
@@ -447,6 +460,7 @@ async def chat_ws(websocket: WebSocket):
 
             # ── Tâche lourde → planifier puis exécuter en sous-agents (contexte frais) ──
             stopped = False
+            executed: list[tuple[str, int]] = []
             if should_plan(user_input):
                 await websocket.send_text(json.dumps({"type": "planning"}))
                 subtasks = await plan_task(user_input)
@@ -469,16 +483,26 @@ async def chat_ws(websocket: WebSocket):
                                          "content": "[CONTEXTE DES ÉTAPES PRÉCÉDENTES]\n" + scratch})
                     sub_msgs.append({"role": "user",
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
-                    stopped, last = await _run_agent_loop(
+                    stopped, last, ex = await _run_agent_loop(
                         sub_msgs, task_type, websocket, queue, session_id, persist=True)
+                    executed += ex
                     if stopped:
                         break
                     scratch = (scratch + f"- {sub} → {last.strip()[:300]}\n")[-1500:]
             else:
                 # Chemin simple : contexte complet (avec mémoire), élagué au budget
                 messages = _build_messages(history, subtasks[0], memory_context, attachments)
-                stopped, _ = await _run_agent_loop(
+                stopped, _, executed = await _run_agent_loop(
                     messages, task_type, websocket, queue, session_id, persist=True)
+
+            # ── Compétence apprise : proposer d'enregistrer une tâche réussie ──
+            if not stopped and len(executed) >= 2 and all(rc == 0 for _, rc in executed):
+                await websocket.send_text(json.dumps({
+                    "type": "skill_suggestion",
+                    "name": _slugify(user_input),
+                    "description": user_input[:80],
+                    "commands": [c for c, _ in executed],
+                }))
 
             if not stopped:
                 await websocket.send_text(json.dumps({"type": "done", "model": select_model(task_type)}))
