@@ -36,6 +36,36 @@ def put_system_prompt(body: SystemPromptBody):
     return {"status": "ok"}
 
 
+# ── Contexte utilisateur & profil (locaux, ~/.config/mi-saina) ─────────────────
+from services import userctx  # noqa: E402
+
+
+class TextBody(BaseModel):
+    content: str
+
+
+@router.get("/context")
+def get_context():
+    return {"content": userctx.read_context()}
+
+
+@router.put("/context")
+def put_context(body: TextBody):
+    userctx.write_context(body.content)
+    return {"status": "ok"}
+
+
+@router.get("/profile")
+def get_profile():
+    return {"content": userctx.read_profile()}
+
+
+@router.put("/profile")
+def put_profile(body: TextBody):
+    userctx.write_profile(body.content)
+    return {"status": "ok"}
+
+
 # ── Skills ────────────────────────────────────────────────────────────────────
 
 @router.get("/skills")

@@ -16,12 +16,13 @@ from services.memory import (
 from services.shell_exec import execute_command
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget
-from services import diagnostics
+from services import diagnostics, userctx
 from services.sysinfo import system_block
 
 router = APIRouter()
 
 EXEC_RE = re.compile(r'\[EXEC:\s*(.*?)\]', re.DOTALL)
+REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 
@@ -31,7 +32,11 @@ _DEFAULT_SYSTEM = "Tu es mi-saina, un assistant IA local expert avec accès comp
 def _load_system_prompt() -> str:
     base = SYSTEM_PROMPT_FILE.read_text() if SYSTEM_PROMPT_FILE.exists() else _DEFAULT_SYSTEM
     # Infos matériel/distribution détectées à l'exécution (jamais versionnées)
-    return f"{base}\n\n{system_block()}"
+    parts = [base, system_block()]
+    ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
+    if ctx:
+        parts.append(ctx)
+    return "\n\n".join(parts)
 
 
 def _build_messages(history, user_input, memory_context, attachments=None):
@@ -352,6 +357,42 @@ async def chat_complete(body: ChatRequest):
     }
 
 
+def _drain_redirects(queue: asyncio.Queue) -> list[str]:
+    """Récupère sans bloquer les messages chat envoyés PENDANT la tâche (redirection).
+    Les messages de contrôle (stop, etc.) sont remis dans la file."""
+    texts, keep = [], []
+    while True:
+        try:
+            raw = queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
+        if raw is None:
+            keep.append(raw)
+            continue
+        try:
+            p = json.loads(raw)
+        except Exception:
+            continue
+        if p.get("type", "chat") == "chat" and p.get("message", "").strip():
+            texts.append(p["message"].strip())
+        else:
+            keep.append(raw)
+    for r in keep:
+        queue.put_nowait(r)
+    return texts
+
+
+async def _inject_redirects(redirects: list[str], messages: list, websocket: WebSocket,
+                            session_id: str, persist: bool) -> None:
+    """Injecte les redirections dans le contexte de la tâche en cours."""
+    for tx in redirects:
+        await websocket.send_text(json.dumps({"type": "redirect_ack", "text": tx}))
+        if persist:
+            await add_message(session_id, "user", tx)
+        messages.append({"role": "user",
+                         "content": f"[NOUVELLE INSTRUCTION DE L'UTILISATEUR — prends-la en compte maintenant] {tx}"})
+
+
 async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
                           persist: bool = True) -> tuple[bool, str, list[tuple[str, int]]]:
@@ -377,8 +418,20 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
             await add_message(session_id, "assistant", full_response)
         messages.append({"role": "assistant", "content": full_response})
 
+        # Mémorisation durable d'une préférence/fait → profil utilisateur
+        for fact in REMEMBER_RE.findall(full_response):
+            fact = fact.strip()
+            if fact:
+                userctx.append_profile(fact)
+                await websocket.send_text(json.dumps({"type": "memory_saved", "fact": fact}))
+
         cmds = [c.strip() for c in EXEC_RE.findall(full_response) if c.strip()]
         if not cmds:
+            # Pas de commande : si l'utilisateur a redirigé pendant la réponse, on continue
+            redirects = _drain_redirects(queue)
+            if redirects:
+                await _inject_redirects(redirects, messages, websocket, session_id, persist)
+                continue
             break
 
         results: list[tuple[str, str, int]] = []
@@ -406,6 +459,10 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
             break
 
         messages.append({"role": "user", "content": _format_exec_feedback(results)})
+        # Redirection envoyée pendant l'exécution → prise en compte à l'étape suivante
+        redirects = _drain_redirects(queue)
+        if redirects:
+            await _inject_redirects(redirects, messages, websocket, session_id, persist)
 
     return stopped, last, executed
 
@@ -434,6 +491,7 @@ async def chat_ws(websocket: WebSocket):
             user_input = payload.get("message", "")
             task_type = payload.get("task_type", "reason")
             attachments = payload.get("attachments")
+            skill_name = payload.get("skill")   # compétence ayant déclenché ce message (si applicable)
 
             if not user_input.strip() and not attachments:
                 continue
@@ -495,8 +553,18 @@ async def chat_ws(websocket: WebSocket):
                 stopped, _, executed = await _run_agent_loop(
                     messages, task_type, websocket, queue, session_id, persist=True)
 
-            # ── Compétence apprise : proposer d'enregistrer une tâche réussie ──
-            if not stopped and len(executed) >= 2 and all(rc == 0 for _, rc in executed):
+            # ── Auto-correction d'une compétence : la compétence a échoué puis été corrigée ──
+            if (skill_name and not stopped and executed
+                    and any(rc != 0 for _, rc in executed)
+                    and any(rc == 0 for _, rc in executed)):
+                await websocket.send_text(json.dumps({
+                    "type": "skill_update_suggestion",
+                    "name": skill_name,
+                    "description": user_input[:80],
+                    "commands": [c for c, rc in executed if rc == 0],
+                }))
+            # ── Compétence apprise : proposer d'enregistrer une nouvelle tâche réussie ──
+            elif not skill_name and not stopped and len(executed) >= 2 and all(rc == 0 for _, rc in executed):
                 await websocket.send_text(json.dumps({
                     "type": "skill_suggestion",
                     "name": _slugify(user_input),

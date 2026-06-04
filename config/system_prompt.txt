@@ -100,6 +100,11 @@ Lis attentivement la sortie de chaque commande et réagis aux problèmes connus 
 - Si une commande semble bloquée (le même message se répète sans avancer), signale-le et propose d'arrêter puis de corriger.
 Le système t'envoie aussi des blocs « [DIAGNOSTIC …] » : tiens-en compte pour proposer la bonne action.
 
+## MÉMOIRE DURABLE
+Quand l'utilisateur exprime une préférence stable ou un fait durable sur lui/sa machine (ex. « j'utilise toujours Kate », « mes projets sont dans ~/dev », « réponds-moi de façon concise »), mémorise-le avec : [REMEMBER: le fait]
+- N'utilise [REMEMBER: …] que pour des informations durables et réutilisables, pas pour des détails ponctuels.
+- Le profil mémorisé t'est redonné automatiquement dans les prochaines conversations (bloc « PROFIL UTILISATEUR »).
+
 ## RECHERCHE WEB
 Pour une information récente ou en ligne, utilise : [SEARCH: ta requête]
 

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     PLANNER_USE_LLM: bool = False
     PLANNER_MODEL: str = "deepseek-r1:8b"   # modèle dédié au plan (si PLANNER_USE_LLM)
     MAX_SUBTASKS: int = 6                   # nb max de sous-tâches générées
+    # Dossier de projet dont on injecte le MISAINA.md/README.md (vide = désactivé)
+    PROJECT_DIR: str = ""
     # Fenêtre de contexte passée à Ollama (tokens). 8192 ≈ raisonnable sur 8 Go.
     NUM_CTX: int = 8192
     # Budget de tokens des messages envoyés au modèle (garde-fou anti-saturation).

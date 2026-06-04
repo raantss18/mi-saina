@@ -14,7 +14,10 @@ export default function ConfigPanel() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savedPrompt, setSavedPrompt] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [tab, setTab] = useState<"prompt" | "skills">("prompt");
+  const [tab, setTab] = useState<"prompt" | "skills" | "memory">("prompt");
+  const [context, setContext] = useState("");
+  const [profile, setProfile] = useState("");
+  const [memOk, setMemOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
 
@@ -27,8 +30,20 @@ export default function ConfigPanel() {
   useEffect(() => {
     fetch("http://localhost:8000/config/system-prompt")
       .then(r => r.json()).then(d => { setSystemPrompt(d.content); setSavedPrompt(d.content); }).catch(() => {});
+    fetch("http://localhost:8000/config/context").then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
+    fetch("http://localhost:8000/config/profile").then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
     fetchSkills();
   }, []);
+
+  const saveMemory = async () => {
+    await fetch("http://localhost:8000/config/context", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: context }),
+    });
+    await fetch("http://localhost:8000/config/profile", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: profile }),
+    });
+    setMemOk("✓ Enregistré"); setTimeout(() => setMemOk(""), 2000);
+  };
 
   const fetchSkills = () => {
     fetch("http://localhost:8000/config/skills")
@@ -71,13 +86,13 @@ export default function ConfigPanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6 }}>
-        {(["prompt", "skills"] as const).map(t => (
+        {(["prompt", "skills", "memory"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "4px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11,
             background: tab === t ? "var(--accent)" : "var(--border)",
             border: "none", color: tab === t ? "#000" : "var(--text)", fontWeight: tab === t ? 700 : 400,
           }}>
-            {t === "prompt" ? "System Prompt" : "Skills"}
+            {t === "prompt" ? "System Prompt" : t === "skills" ? "Skills" : "Mémoire"}
           </button>
         ))}
       </div>
@@ -228,6 +243,39 @@ export default function ConfigPanel() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Mémoire : contexte global + profil utilisateur */}
+      {tab === "memory" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+            Ces notes locales (<code>~/.config/mi-saina/</code>) sont injectées automatiquement dans chaque conversation. Jamais versionnées.
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>Contexte global (context.md)</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Qui tu es, ta machine, tes habitudes — instructions persistantes.</div>
+            <textarea value={context} onChange={e => setContext(e.target.value)} rows={6}
+              placeholder="Ex : Je suis prof de maths, mes projets LaTeX sont dans ~/Documents/GitHub, réponds en français concis."
+              style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: 10, borderRadius: 6, fontSize: 12, fontFamily: "monospace", resize: "vertical", outline: "none", lineHeight: 1.5 }} />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: "var(--green)", fontWeight: 700, marginBottom: 4 }}>Profil mémorisé (profile.md)</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Préférences apprises automatiquement (via [REMEMBER: …]). Modifiable à la main.</div>
+            <textarea value={profile} onChange={e => setProfile(e.target.value)} rows={6}
+              placeholder="(vide — se remplit quand mi-saina mémorise tes préférences)"
+              style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: 10, borderRadius: 6, fontSize: 12, fontFamily: "monospace", resize: "vertical", outline: "none", lineHeight: 1.5 }} />
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button onClick={saveMemory}
+              style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+              Sauvegarder
+            </button>
+            {memOk && <span style={{ fontSize: 11, color: "var(--green)" }}>{memOk}</span>}
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.0] - 2026-06-04
+
+### Ajouté
+- **Planificateur de tâches local** : crée des tâches récurrentes (toutes les X min / chaque jour / chaque semaine) exécutées en arrière-plan, **headless et sûres** (commandes root/destructrices ignorées faute de validation). Résultats consultables dans une session « ⏰ ». Panneau **⏰ Tâches** + endpoints `/schedule`.
+- **Interrupt-redirect** : envoie un message pendant qu'une tâche tourne → il est injecté comme nouvelle instruction (sans tout arrêter). Notice « ↪ Nouvelle instruction prise en compte ».
+- **Auto-correction des compétences** : si une compétence (`/slash`) échoue puis est corrigée par l'agent, mi-saina propose de **mettre à jour la compétence** avec la version qui a marché.
+
+### Notes
+- **Sous-agents parallèles : non retenu** pour l'instant. Sur une seule carte 8 Go, Ollama sérialise les générations → le parallélisme n'accélère pas (et complique la validation/sudo simultanés). Le découpage séquentiel reste le bon choix local. (Voir TODO.)
+
+
 Toutes les évolutions notables de **mi-saina** sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
 versionnage [SemVer](https://semver.org/lang/fr/).
@@ -9,6 +20,8 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 ### Ajouté
 - **Compétences apprises** (inspiré de hermes-agent, adapté local) : après une tâche réussie (≥2 commandes exécutées avec succès), mi-saina propose de l'enregistrer comme **compétence réutilisable** (`/slash`) construite à partir des commandes. Réutilisable ensuite depuis le menu des skills.
 - **Recherche plein-texte de l'historique (SQLite FTS5)** : section « Recherche dans l'historique » du panneau sessions — retrouve une ancienne conversation par mot-clé (extraits surlignés) et l'ouvre d'un clic. Vient compléter la recherche sémantique.
+- **Fichiers de contexte** : un `~/.config/mi-saina/context.md` (instructions/contexte persistants) et un `MISAINA.md`/`README.md` de projet (dossier `PROJECT_DIR`) sont injectés automatiquement dans le prompt. Éditables via l'onglet **Mémoire** du panneau Config.
+- **Profil utilisateur persistant** : l'assistant mémorise des préférences/faits durables via `[REMEMBER: …]` dans `~/.config/mi-saina/profile.md`, réinjectés à chaque conversation (notice « 🧠 Mémorisé »). Éditable dans l'onglet Mémoire. Endpoints `/config/context` et `/config/profile`.
 - Analyse de hermes-agent et feuille de route (TODO) des fonctionnalités à reprendre en restant **local & simple**.
 
 ### Modifié

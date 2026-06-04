@@ -7,6 +7,7 @@ import MemoryPanel from "../components/MemoryPanel";
 import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
 import TerminalPanel, { TaskStatus } from "../components/TerminalPanel";
+import SchedulePanel from "../components/SchedulePanel";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -33,7 +34,7 @@ interface Attachment {
 interface SearchResult { title: string; url: string; snippet: string; }
 interface Skill { name: string; trigger: string; description: string; icon: string; prompt: string; }
 
-type Panel = "models" | "config" | null;
+type Panel = "models" | "config" | "schedule" | null;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -49,7 +50,8 @@ export default function Home() {
   const [pendingCommand, setPendingCommand] = useState("");
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<{ label: string; message: string; fix: string | null } | null>(null);
-  const [skillSuggestion, setSkillSuggestion] = useState<{ name: string; description: string; commands: string[] } | null>(null);
+  const [skillSuggestion, setSkillSuggestion] = useState<{ name: string; description: string; commands: string[]; update?: boolean } | null>(null);
+  const pendingSkillRef = useRef<string | null>(null);
   const [showTerminal, setShowTerminal] = useState(false);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const turnFailureRef = useRef(false);
@@ -195,9 +197,27 @@ export default function Home() {
         return;
       }
 
+      // Redirection prise en compte pendant la tâche
+      if (data.type === "redirect_ack") {
+        setMessages(prev => [...prev, { role: "plan", content: `↪ Nouvelle instruction prise en compte : ${data.text}` }]);
+        return;
+      }
+
+      // Mémoire durable : un fait/préférence a été retenu dans le profil
+      if (data.type === "memory_saved") {
+        setMessages(prev => [...prev, { role: "plan", content: `🧠 Mémorisé : ${data.fact}` }]);
+        return;
+      }
+
       // Compétence apprise : proposer d'enregistrer la tâche réussie
       if (data.type === "skill_suggestion") {
         setSkillSuggestion({ name: data.name, description: data.description, commands: data.commands || [] });
+        return;
+      }
+
+      // Auto-correction : proposer de mettre à jour une compétence qui a été corrigée
+      if (data.type === "skill_update_suggestion") {
+        setSkillSuggestion({ name: data.name, description: data.description, commands: data.commands || [], update: true });
         return;
       }
 
@@ -268,7 +288,9 @@ export default function Home() {
       task_type: "reason",
       session_id: sessionId,
       attachments: attachments.length ? attachments : undefined,
+      skill: pendingSkillRef.current || undefined,
     }));
+    pendingSkillRef.current = null;
     setInput("");
     setAttachments([]);
     setStreaming(true);
@@ -381,6 +403,7 @@ export default function Home() {
 
   const applySkill = (skill: Skill) => {
     setInput(skill.prompt);
+    pendingSkillRef.current = skill.name;   // provenance pour l'auto-correction
     setSkillMenu(false);
     inputRef.current?.focus();
   };
@@ -439,6 +462,9 @@ export default function Home() {
             <button onClick={() => setPanel(p => p === "models" ? null : "models")} style={btnStyle(panel === "models")}>
               ⬡ Modèles
             </button>
+            <button onClick={() => setPanel(p => p === "schedule" ? null : "schedule")} style={btnStyle(panel === "schedule")}>
+              ⏰ Tâches
+            </button>
             <button onClick={() => setShowTerminal(v => !v)} title="Afficher/masquer la sortie du terminal" style={btnStyle(showTerminal)}>
               ▣ Terminal
             </button>
@@ -464,6 +490,7 @@ export default function Home() {
           <div style={{ padding: "14px 20px", flexShrink: 0, borderBottom: "1px solid var(--border)", background: "var(--surface)", overflowY: "auto", maxHeight: "50vh" }}>
             {panel === "models" && <ModelPanel onModelChange={(m) => { setActiveModel(m); setPanel(null); }} />}
             {panel === "config" && <ConfigPanel />}
+            {panel === "schedule" && <SchedulePanel onOpenSession={(id) => { loadSession(id); setPanel(null); }} />}
           </div>
         )}
 
@@ -508,10 +535,10 @@ export default function Home() {
             borderRadius: 8, fontSize: 12, color: "var(--text)",
           }}>
             <div style={{ fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>
-              💾 Enregistrer comme compétence ?
+              {skillSuggestion.update ? "🔧 Mettre à jour la compétence (version corrigée) ?" : "💾 Enregistrer comme compétence ?"}
             </div>
             <div style={{ color: "var(--text-muted)", marginBottom: 8 }}>
-              Réutilisable via <code style={{ color: "var(--text)" }}>/{skillSuggestion.name}</code> · {skillSuggestion.commands.length} commande(s) : {skillSuggestion.description}
+              {skillSuggestion.update ? "Remplace" : "Réutilisable via"} <code style={{ color: "var(--text)" }}>/{skillSuggestion.name}</code> · {skillSuggestion.commands.length} commande(s) qui ont réussi
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={() => setSkillSuggestion(null)}
