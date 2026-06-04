@@ -6,6 +6,7 @@ import ConfigPanel from "../components/ConfigPanel";
 import MemoryPanel from "../components/MemoryPanel";
 import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
+import TerminalPanel, { TaskStatus } from "../components/TerminalPanel";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -47,6 +48,9 @@ export default function Home() {
   const [sudoPassword, setSudoPassword] = useState("");
   const [pendingCommand, setPendingCommand] = useState("");
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
+  const turnFailureRef = useRef(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -88,6 +92,7 @@ export default function Home() {
       if (data.type === "done") {
         setActiveModel(data.model || "");
         setStreaming(false);
+        setTaskStatus(turnFailureRef.current ? "failure" : "success");
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant")
@@ -99,6 +104,7 @@ export default function Home() {
 
       if (data.type === "stopped") {
         setStreaming(false);
+        setTaskStatus("stopped");
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant")
@@ -155,6 +161,7 @@ export default function Home() {
 
       // Commande terminée
       if (data.type === "shell_done") {
+        if (data.returncode !== 0 && data.returncode !== undefined) turnFailureRef.current = true;
         setMessages(prev => {
           const idx = [...prev].reverse().findIndex(m => m.role === "shell" && m.command === data.command && !m.shellDone);
           if (idx === -1) return [...prev, { role: "shell", command: data.command, content: data.error || "", shellDone: true, shellStreaming: false, returncode: data.returncode }];
@@ -239,6 +246,8 @@ export default function Home() {
     }
 
     setLastUserMsg(text);
+    turnFailureRef.current = false;
+    setTaskStatus("running");
     setMessages(prev => [...prev, { role: "user", content: text, attachments: attachments.length ? [...attachments] : undefined }]);
     wsRef.current.send(JSON.stringify({
       message: text,
@@ -263,6 +272,22 @@ export default function Home() {
   };
 
   const clearChat = () => { setMessages([]); setLastUserMsg(""); };
+
+  // Charge l'historique d'une session existante dans le fil de discussion
+  const loadSession = async (id: string) => {
+    setSessionId(id);
+    setTaskStatus("idle");
+    setMessages([]);
+    try {
+      const res = await fetch(`http://localhost:8000/memory/sessions/${id}/messages`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setMessages(data
+          .filter((m: { role: string }) => m.role === "user" || m.role === "assistant")
+          .map((m: { role: string; content: string }) => ({ role: m.role as "user" | "assistant", content: m.content })));
+      }
+    } catch { /* session vide ou backend indisponible */ }
+  };
 
   const copyLastResponse = () => {
     const last = [...messages].reverse().find(m => m.role === "assistant");
@@ -338,8 +363,8 @@ export default function Home() {
     <div style={{ display: "flex", height: "100vh", background: "var(--bg)" }}>
       <MemoryPanel
         activeSessionId={sessionId}
-        onSelectSession={(id) => { setSessionId(id); setMessages([]); }}
-        onNewSession={(id) => { setSessionId(id); setMessages([]); }}
+        onSelectSession={(id) => { loadSession(id); }}
+        onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); }}
         refreshKey={memoryRefresh}
       />
 
@@ -376,6 +401,19 @@ export default function Home() {
             <button onClick={() => setPanel(p => p === "models" ? null : "models")} style={btnStyle(panel === "models")}>
               ⬡ Modèles
             </button>
+            <button onClick={() => setShowTerminal(v => !v)} title="Afficher/masquer la sortie du terminal" style={btnStyle(showTerminal)}>
+              ▣ Terminal
+            </button>
+            {/* Statut de la tâche (lu depuis les codes de retour) */}
+            {taskStatus !== "idle" && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 12,
+                color: taskStatus === "running" ? "var(--accent)" : taskStatus === "success" ? "var(--green)" : taskStatus === "failure" ? "var(--red)" : "var(--yellow)",
+                background: "var(--border)",
+              }}>
+                {taskStatus === "running" ? "⟳ en cours" : taskStatus === "success" ? "✓ succès" : taskStatus === "failure" ? "✗ échec" : "■ arrêté"}
+              </span>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: connected ? "var(--green)" : "var(--red)" }} />
               <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{connected ? "connecté" : "hors ligne"}</span>
@@ -391,8 +429,19 @@ export default function Home() {
           </div>
         )}
 
-        {/* Chat */}
-        <ChatWindow messages={messages} onShellInput={sendShellInput} />
+        {/* Chat + Terminal (panneau optionnel à côté) */}
+        <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <ChatWindow messages={messages} onShellInput={sendShellInput} />
+          </div>
+          {showTerminal && (
+            <TerminalPanel
+              entries={messages.filter(m => m.role === "shell")}
+              taskStatus={taskStatus}
+              onClose={() => setShowTerminal(false)}
+            />
+          )}
+        </div>
 
         {/* Search results */}
         {searchResults.length > 0 && (

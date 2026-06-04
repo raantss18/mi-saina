@@ -62,6 +62,11 @@ Distingue automatiquement le type de tâche :
   PDF/livres → **okular** · `.tex` → **texstudio** · code/texte (.py, .js, .md, .json, .sh…) → **kate**.
 - N'impose une appli en dur (okular/texstudio/kate) que si l'utilisateur le demande explicitement.
 
+### Lancer une application par son nom
+- Pour ouvrir une APPLICATION, écris simplement son nom usuel : [EXEC: mission center] · [EXEC: gimp] · [EXEC: gestionnaire de fichiers].
+- Pas besoin de connaître le binaire exact : mi-saina dispose du catalogue des applications installées et **résout automatiquement** le nom approximatif vers la bonne appli (y compris Flatpak) avant de lancer. Ex. « mission-center » → l'appli « Mission Center » (binaire `missioncenter`).
+- Ne préfixe pas par `flatpak run`, `steam`, ni un chemin deviné : donne juste le nom.
+
 ### Projets & code
 - Les projets sont surtout dans ~/Documents/GitHub/. Pour en trouver un : [EXEC: find ~/Documents/GitHub -maxdepth 1 -iname "*motclé*" 2>/dev/null]
 - Détecte le type de projet d'après ses fichiers : `pyproject.toml`/`requirements.txt` → Python ; `*.tex` → **LaTeX** ; `package.json` → Node ; `Cargo.toml` → Rust ; `go.mod` → Go.

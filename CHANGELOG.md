@@ -10,6 +10,13 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 - **Planification & sous-agents** : les tâches « lourdes » (plusieurs actions enchaînées) sont automatiquement découpées en sous-tâches, chacune exécutée par un **sous-agent à contexte frais et minimal** — adapté aux petites VRAM (RTX 4060 8 Go). Découpage **par règles** (instantané, zéro swap de modèle) par défaut ; planificateur LLM optionnel (`PLANNER_USE_LLM`).
 - **Garde-fou de contexte** : budget de tokens (`MAX_CONTEXT_TOKENS`) avec élagage de l'historique avant chaque appel ; fenêtre de contexte bornée (`NUM_CTX`).
 - Affichage du **plan** et de la **progression des étapes** dans l'interface.
+- **Panneau Terminal** optionnel (activable/désactivable, à côté du chat) : sortie agrégée en direct de toutes les commandes.
+- **Statut de tâche** lu depuis les codes de retour : *en cours* / *succès* / *échec* / *arrêté*, affiché dans l'en-tête et le panneau Terminal.
+- **Résolution d'applications par nom approximatif** : catalogue des applis installées (.desktop + Flatpak, ~350 entrées) avec correspondance floue sur le nom, l'identifiant, le binaire, le nom générique et les mots-clés (multilingue). Ex. « mission-center » → appli « Mission Center » (binaire `missioncenter`) ; « gestionnaire de fichiers » → Dolphin ; « machine virtuelle » → virt-manager. Évite l'exécution brute d'un binaire inexistant.
+
+### Corrigé
+- **Historique des conversations** : les anciennes sessions s'affichaient vides alors que les messages étaient bien en base. Sélectionner une session charge désormais son fil via `GET /memory/sessions/{id}/messages`.
+- Curseur clignotant affiché dans **toutes** les bulles assistant lors d'une tâche multi-étapes : il ne s'affiche plus que sur le message en cours.
 - **Routage automatique par type de fichier** : `xdg-open` route vers okular (PDF/livres), texstudio (`.tex`), kate (code/texte) ; associations xdg-mime posées ; recette « projet LaTeX = ouvrir le `main.tex` ».
 
 ### Modifié

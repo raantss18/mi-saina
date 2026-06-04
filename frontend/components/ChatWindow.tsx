@@ -223,7 +223,9 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
               fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
               {msg.content}
-              {msg.streaming && <span style={{ color: "var(--accent)", animation: "blink 1s step-end infinite" }}>▋</span>}
+              {msg.streaming && i === messages.length - 1 && (
+                <span style={{ color: "var(--accent)", animation: "blink 1s step-end infinite" }}>▋</span>
+              )}
             </div>
             {msg.model && (
               <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3, padding: "0 4px" }}>{msg.model}</div>

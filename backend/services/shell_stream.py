@@ -24,6 +24,8 @@ import shlex
 import struct
 import termios
 
+from services import apps
+
 ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 # ── Applications graphiques (GUI) ─────────────────────────────────────────────
@@ -123,6 +125,9 @@ def is_gui_command(cmd: str) -> bool:
         if head == "gio":
             toks = _strip_leading_sudo(cmd).split()
             return "open" in toks[1:2]
+        return True
+    # Binaire d'une application graphique installée (catalogue .desktop)
+    if apps.is_gui_binary(head):
         return True
     return False
 
@@ -299,6 +304,18 @@ async def stream_pty(
     if requires_root and not sudo_password:
         yield {"type": "needs_sudo", "command": cmd}
         return
+
+    # ── Nom d'application approximatif (binaire introuvable) → résolution ──
+    #   Ex. « mission-center » → appli « Mission Center » (binaire missioncenter).
+    if not requires_root and apps.looks_like_app_launch(cmd):
+        resolved = apps.resolve_app(cmd)
+        if resolved:
+            launch_cmd, app_name = resolved
+            yield {"type": "chunk",
+                   "text": f"🔎 Application reconnue : « {app_name} » → {launch_cmd}\n"}
+            async for ev in launch_gui(launch_cmd):
+                yield ev
+            return
 
     actual_cmd = sanitize(cmd)
 
