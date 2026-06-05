@@ -214,7 +214,7 @@ ExecStart=$VENV_DIR/bin/uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME
-Environment=PATH=$VENV_DIR/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=$VENV_DIR/bin:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=default.target

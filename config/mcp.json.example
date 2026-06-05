@@ -6,6 +6,11 @@
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/USER/Documents"],
       "env": {}
     },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "/home/USER/mon-projet"],
+      "env": {}
+    },
     "fetch": {
       "command": "uvx",
       "args": ["mcp-server-fetch"],

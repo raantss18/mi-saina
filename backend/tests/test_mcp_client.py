@@ -5,6 +5,7 @@ On lance un VRAI faux serveur MCP (script Python parlant le JSON-RPC sur stdio)
 pour valider initialize → tools/list → tools/call de bout en bout, sans dépendance.
 """
 import json
+import os
 import sys
 import textwrap
 
@@ -98,6 +99,17 @@ def test_load_config(tmp_path, monkeypatch):
 def test_load_config_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(mcp, "CONFIG_FILE", tmp_path / "absent.json")
     assert mcp.load_config() == {}
+
+
+def test_spawn_env_adds_user_bin(monkeypatch):
+    # Les services systemd ont un PATH restreint ; on doit y rajouter ~/.local/bin
+    # (sinon `uvx mcp-server-git` etc. ne démarrent pas).
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    srv = mcp.MCPServer("x", "echo", [])
+    env = srv._spawn_env()
+    paths = env["PATH"].split(os.pathsep)
+    assert os.path.expanduser("~/.local/bin") in paths
+    assert env["PATH"].count("/usr/bin") == 1   # pas de doublon des chemins existants
 
 
 # ── Bout en bout avec un vrai sous-processus ───────────────────────────────────

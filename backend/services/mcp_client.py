@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 
 CONFIG_FILE = Path(os.path.expanduser("~/.config/mi-saina/mcp.json"))
@@ -60,15 +61,36 @@ class MCPServer:
         self._id = 0
         self._lock = asyncio.Lock()      # une requête en vol à la fois
 
+    def _spawn_env(self) -> dict:
+        """Env du serveur, avec un PATH élargi aux binaires utilisateur.
+        Les services systemd ont un PATH restreint ; or des lanceurs courants
+        (uvx, pipx, npm global…) vivent dans ~/.local/bin — on les rend trouvables
+        sinon un serveur comme `uvx mcp-server-git` ne démarre pas."""
+        env = {**os.environ, **self.env}
+        extra = [
+            os.path.expanduser("~/.local/bin"),
+            os.path.expanduser("~/bin"),
+            os.path.expanduser("~/.cargo/bin"),
+            "/usr/local/bin",
+        ]
+        existing = env.get("PATH", "").split(os.pathsep)
+        env["PATH"] = os.pathsep.join(
+            [p for p in extra if p not in existing] + existing)
+        return env
+
     async def start(self) -> bool:
         """Lance le serveur et récupère ses outils. False si échec (toléré)."""
         try:
+            env = self._spawn_env()
+            # Résout le binaire dans le PATH élargi (create_subprocess_exec n'utilise
+            # pas le PATH de `env`, mais celui du process courant).
+            resolved = shutil.which(self.command, path=env["PATH"]) or self.command
             self.proc = await asyncio.create_subprocess_exec(
-                self.command, *self.args,
+                resolved, *self.args,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
-                env={**os.environ, **self.env},
+                env=env,
             )
             await self._rpc("initialize", {
                 "protocolVersion": _PROTOCOL_VERSION,
