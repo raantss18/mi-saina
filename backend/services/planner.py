@@ -29,11 +29,73 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
+_EXEC_RE = re.compile(r"\[EXEC:\s*(.+?)\]", re.IGNORECASE | re.DOTALL)
+_NOISE_RE = re.compile(r"\[(?:REMEMBER|RÉSULTAT|RESULTAT|DIAGNOSTIC|STATUT|INSTRUCTION)[^\]]*\]",
+                       re.IGNORECASE)
+_DIGEST_HEADER = "[RÉSUMÉ DES ÉCHANGES PLUS ANCIENS — élagués pour tenir dans le contexte]"
+
+
+def _digest_line(msg: dict, limit: int = 160) -> str | None:
+    """Une ligne compacte résumant un message élagué (extractif, sans LLM)."""
+    role = msg.get("role")
+    raw = msg.get("content") or ""
+    # Les commandes exécutées sont l'info la plus utile à conserver
+    cmds = [c.strip() for c in _EXEC_RE.findall(raw)]
+    text = _EXEC_RE.sub("", raw)
+    text = _NOISE_RE.sub("", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    label = {"user": "Utilisateur", "assistant": "Assistant",
+             "system": "Système"}.get(role, role or "?")
+    parts = []
+    if text:
+        parts.append(text[:limit] + ("…" if len(text) > limit else ""))
+    if cmds:
+        parts.append("commandes : " + " ; ".join(c[:80] for c in cmds[:3]))
+    if not parts:
+        return None
+    return f"{label} — " + " | ".join(parts)
+
+
+def _build_digest(dropped: list[dict], max_tokens: int) -> str:
+    """Résumé extractif des messages élagués, borné à max_tokens (sinon on retire
+    les lignes les plus anciennes)."""
+    lines = [ln for ln in (_digest_line(m) for m in dropped) if ln]
+    if not lines:
+        return ""
+    # Si le digest déborde, on sacrifie les lignes les PLUS RÉCENTES : elles sont
+    # adjacentes à la fenêtre conservée (déjà couvertes), tandis que les premiers
+    # échanges portent l'intention initiale de la session — à préserver.
+    while lines and estimate_tokens(_DIGEST_HEADER + "\n" + "\n".join(f"- {l}" for l in lines)) > max_tokens:
+        lines.pop()
+    if not lines:
+        return ""
+    return _DIGEST_HEADER + "\n" + "\n".join(f"- {l}" for l in lines)
+
+
+def _fill_from_end(older: list[dict], base_used: int, budget: int) -> tuple[list[dict], list[dict]]:
+    """Garde le plus de messages récents possible dans `budget`.
+    Retourne (gardés_dans_l_ordre, élagués_dans_l_ordre)."""
+    used = base_used
+    kept_rev: list[dict] = []
+    cut = 0
+    for i in range(len(older) - 1, -1, -1):
+        t = estimate_tokens(older[i].get("content", ""))
+        if used + t > budget:
+            cut = i + 1
+            break
+        used += t
+        kept_rev.append(older[i])
+    return list(reversed(kept_rev)), older[:cut]
+
+
 def fit_budget(messages: list[dict], max_tokens: int | None = None) -> list[dict]:
     """Élague l'historique pour tenir dans le budget de tokens.
 
-    Garde toujours : le message système (1er) et le DERNIER message.
-    Remplit le reste depuis la fin (messages récents prioritaires).
+    Garde toujours : le message système (1er) et le DERNIER message ; remplit le
+    reste depuis la fin (messages récents prioritaires). Quand des messages plus
+    anciens doivent être retirés, ils sont **résumés** (extractif, sans LLM) dans
+    un message synthétique au lieu d'être purement supprimés — pour garder le fil
+    sur de longues sessions (cf. settings.CONTEXT_DIGEST).
     """
     max_tokens = max_tokens or settings.MAX_CONTEXT_TOKENS
     if not messages:
@@ -43,18 +105,29 @@ def fit_budget(messages: list[dict], max_tokens: int | None = None) -> list[dict
     if not body:
         return messages
 
-    used = estimate_tokens(system["content"]) if system else 0
+    base = estimate_tokens(system["content"]) if system else 0
     last = body[-1]
-    used += estimate_tokens(last["content"])
-    kept_rev = [last]
-    for msg in reversed(body[:-1]):
-        t = estimate_tokens(msg.get("content", ""))
-        if used + t > max_tokens:
-            break
-        used += t
-        kept_rev.append(msg)
-    kept = list(reversed(kept_rev))
-    return ([system] + kept) if system else kept
+    base += estimate_tokens(last["content"])
+    older = body[:-1]
+
+    # 1re passe : remplir avec tout le budget pour savoir s'il y a élagage.
+    kept, dropped = _fill_from_end(older, base, max_tokens)
+    if not dropped:
+        return ([system] + kept + [last]) if system else (kept + [last])
+
+    # Élagage nécessaire. Sans résumé → comportement historique (coupe nette).
+    if not settings.CONTEXT_DIGEST:
+        return ([system] + kept + [last]) if system else (kept + [last])
+
+    # 2e passe : réserver une part du budget pour le résumé, puis le construire.
+    digest_budget = max(150, max_tokens // 6)
+    kept, dropped = _fill_from_end(older, base + digest_budget, max_tokens)
+    digest = _build_digest(dropped, digest_budget) if dropped else ""
+
+    head = [system] if system else []
+    if digest:
+        head.append({"role": "user", "content": digest})
+    return head + kept + [last]
 
 
 def should_plan(user_input: str) -> bool:

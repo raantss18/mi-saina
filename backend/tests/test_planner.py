@@ -8,6 +8,7 @@ Tests for the planner service:
 """
 import pytest
 from unittest.mock import patch, AsyncMock
+from config import settings
 from services.planner import (
     estimate_tokens,
     fit_budget,
@@ -15,6 +16,9 @@ from services.planner import (
     rule_split,
     _parse_subtasks,
     plan_task,
+    _digest_line,
+    _build_digest,
+    _DIGEST_HEADER,
 )
 
 
@@ -93,6 +97,96 @@ class TestFitBudget:
         result = fit_budget(msgs, max_tokens=5)
         assert len(result) == 1
         assert result[0]["content"] == "hello"
+
+
+# ── fit_budget : résumé extractif de l'historique élagué ────────────────────────
+
+class TestContextDigest:
+    def _long_session(self):
+        msgs = [{"role": "system", "content": "sys"}]
+        for i in range(30):
+            msgs.append({"role": "user", "content": f"Question numéro {i} " * 10})
+            msgs.append({"role": "assistant", "content": f"Réponse numéro {i} " * 10})
+        msgs.append({"role": "user", "content": "dernière question"})
+        return msgs
+
+    def test_digest_inserted_when_trimming(self, monkeypatch):
+        monkeypatch.setattr(settings, "CONTEXT_DIGEST", True)
+        result = fit_budget(self._long_session(), max_tokens=300)
+        # système + résumé + quelques récents + dernier
+        assert result[0]["role"] == "system"
+        assert result[1]["content"].startswith(_DIGEST_HEADER)
+        assert result[-1]["content"] == "dernière question"
+
+    def test_digest_mentions_old_content(self, monkeypatch):
+        monkeypatch.setattr(settings, "CONTEXT_DIGEST", True)
+        result = fit_budget(self._long_session(), max_tokens=300)
+        digest = result[1]["content"]
+        assert "numéro 0" in digest      # le tout premier échange (origine) est préservé
+
+    def test_digest_respects_budget(self, monkeypatch):
+        monkeypatch.setattr(settings, "CONTEXT_DIGEST", True)
+        result = fit_budget(self._long_session(), max_tokens=300)
+        digest = result[1]["content"]
+        assert estimate_tokens(digest) <= max(150, 300 // 6) + 5
+
+    def test_disabled_falls_back_to_hard_cut(self, monkeypatch):
+        monkeypatch.setattr(settings, "CONTEXT_DIGEST", False)
+        result = fit_budget(self._long_session(), max_tokens=300)
+        assert not any(_DIGEST_HEADER in (m.get("content") or "") for m in result)
+        assert result[0]["role"] == "system"
+        assert result[-1]["content"] == "dernière question"
+
+    def test_no_digest_when_no_trim(self, monkeypatch):
+        monkeypatch.setattr(settings, "CONTEXT_DIGEST", True)
+        msgs = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "salut"},
+            {"role": "assistant", "content": "bonjour"},
+            {"role": "user", "content": "ça va ?"},
+        ]
+        result = fit_budget(msgs, max_tokens=10_000)
+        assert result == msgs
+
+
+class TestDigestLine:
+    def test_user_message(self):
+        line = _digest_line({"role": "user", "content": "ouvre le fichier rapport.pdf"})
+        assert line.startswith("Utilisateur —")
+        assert "rapport.pdf" in line
+
+    def test_extracts_exec_commands(self):
+        line = _digest_line({"role": "assistant",
+                             "content": "Je lance ça [EXEC: ls -la] pour voir."})
+        assert "commandes : ls -la" in line
+        assert "[EXEC:" not in line
+
+    def test_empty_message_returns_none(self):
+        assert _digest_line({"role": "user", "content": "   "}) is None
+
+    def test_strips_noise_markers(self):
+        line = _digest_line({"role": "user",
+                             "content": "[RÉSULTAT DES COMMANDES] tout va bien"})
+        assert "[RÉSULTAT" not in line
+        assert "tout va bien" in line
+
+    def test_truncates_long_content(self):
+        line = _digest_line({"role": "user", "content": "mot " * 200})
+        assert "…" in line
+
+
+class TestBuildDigest:
+    def test_empty_returns_empty_string(self):
+        assert _build_digest([], 100) == ""
+
+    def test_keeps_oldest_when_over_budget(self):
+        dropped = [{"role": "user", "content": f"message très long {i} " * 20}
+                   for i in range(10)]
+        digest = _build_digest(dropped, 120)
+        assert estimate_tokens(digest) <= 120
+        # le plus récent (9) est sacrifié avant le plus ancien (0) — origine préservée
+        assert "long 0" in digest
+        assert "long 9" not in digest
 
 
 # ── should_plan ───────────────────────────────────────────────────────────────

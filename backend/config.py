@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     NUM_CTX: int = 8192
     # Budget de tokens des messages envoyés au modèle (garde-fou anti-saturation).
     MAX_CONTEXT_TOKENS: int = 5500
+    # Résumer (extractif, sans LLM) l'historique élagué au lieu de le couper net,
+    # pour garder le fil sur de longues sessions. False = ancien comportement.
+    CONTEXT_DIGEST: bool = True
 
     class Config:
         env_file = str(_ENV_FILE)
