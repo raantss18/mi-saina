@@ -8,6 +8,7 @@ import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
 import TerminalPanel, { TaskStatus } from "../components/TerminalPanel";
 import SchedulePanel from "../components/SchedulePanel";
+import { API_BASE, WS_BASE } from "../lib/config";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -72,12 +73,12 @@ export default function Home() {
 
   // Charger les skills au démarrage
   useEffect(() => {
-    fetch("http://localhost:8000/config/skills")
+    fetch(`${API_BASE}/config/skills`)
       .then(r => r.json()).then(setSkills).catch(() => {});
   }, []);
 
   const connect = useCallback(() => {
-    const ws = new WebSocket("ws://localhost:8000/chat/ws");
+    const ws = new WebSocket(`${WS_BASE}/chat/ws`);
     wsRef.current = ws;
     ws.onopen = () => setConnected(true);
     ws.onclose = () => { setConnected(false); setStreaming(false); setTimeout(connect, 3000); };
@@ -282,7 +283,7 @@ export default function Home() {
   // Rafraîchir les skills quand le panel config se ferme
   useEffect(() => {
     if (panel !== "config") {
-      fetch("http://localhost:8000/config/skills")
+      fetch(`${API_BASE}/config/skills`)
         .then(r => r.json()).then(setSkills).catch(() => {});
     }
   }, [panel]);
@@ -293,7 +294,7 @@ export default function Home() {
 
     const searchMatch = text.match(/\[SEARCH:\s*(.+?)\]/i);
     if (searchMatch) {
-      fetch("http://localhost:8000/search/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: searchMatch[1] }) })
+      fetch(`${API_BASE}/search/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: searchMatch[1] }) })
         .then(r => r.json()).then(d => { setSearchResults(d); setSearchQuery(searchMatch[1]); }).catch(() => {});
     }
 
@@ -333,7 +334,7 @@ export default function Home() {
     setTaskStatus("idle");
     setMessages([]);
     try {
-      const res = await fetch(`http://localhost:8000/memory/sessions/${id}/messages`);
+      const res = await fetch(`${API_BASE}/memory/sessions/${id}/messages`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setMessages(data
@@ -366,11 +367,11 @@ export default function Home() {
     if (!s) return;
     const prompt = `Refais cette tâche : ${s.description}\n\nCommandes de référence (adapte-les au contexte) :\n${s.commands.map(c => `[EXEC: ${c}]`).join("\n")}`;
     try {
-      await fetch("http://localhost:8000/config/skills", {
+      await fetch(`${API_BASE}/config/skills`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: s.name, trigger: `/${s.name}`, description: s.description, icon: "💾", prompt }),
       });
-      fetch("http://localhost:8000/config/skills").then(r => r.json()).then(setSkills).catch(() => {});
+      fetch(`${API_BASE}/config/skills`).then(r => r.json()).then(setSkills).catch(() => {});
     } catch { /* backend indisponible */ }
   };
 

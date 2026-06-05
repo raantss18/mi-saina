@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/config";
 
 interface Session {
   id: string;
@@ -38,7 +39,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
 
   const fetchSessions = async () => {
     try {
-      const res = await fetch("http://localhost:8000/memory/sessions");
+      const res = await fetch(`${API_BASE}/memory/sessions`);
       if (res.ok) setSessions(await res.json());
     } catch {}
   };
@@ -47,7 +48,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
 
   const handleNew = async () => {
     try {
-      const res = await fetch("http://localhost:8000/memory/sessions", {
+      const res = await fetch(`${API_BASE}/memory/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: null }),
@@ -61,7 +62,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (!confirm("Supprimer cette session ?")) return;
-    await fetch(`http://localhost:8000/memory/sessions/${id}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/memory/sessions/${id}`, { method: "DELETE" });
     fetchSessions();
   };
 
@@ -69,7 +70,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
     const q = histQuery.trim();
     if (!q) { setHistResults([]); return; }
     try {
-      const res = await fetch(`http://localhost:8000/memory/history-search?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${API_BASE}/memory/history-search?q=${encodeURIComponent(q)}`);
       if (res.ok) setHistResults(await res.json());
     } catch {}
   };
@@ -78,7 +79,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
     if (!searchQuery.trim()) return;
     setSearching(true);
     try {
-      const res = await fetch("http://localhost:8000/memory/search", {
+      const res = await fetch(`${API_BASE}/memory/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: searchQuery, top_k: 5 }),

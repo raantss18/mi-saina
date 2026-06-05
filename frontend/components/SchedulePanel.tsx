@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/config";
 
 interface Job {
   id: string;
@@ -13,7 +14,7 @@ interface Job {
   last_session?: string;
 }
 
-const API = "http://localhost:8000/schedule";
+const API = `${API_BASE}/schedule`;
 const DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
 function describe(s: string): string {

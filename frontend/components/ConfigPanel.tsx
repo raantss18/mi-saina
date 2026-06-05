@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_BASE } from "../lib/config";
 
 interface Skill {
   name: string;
@@ -33,17 +34,17 @@ export default function ConfigPanel() {
   const emptySkill = (): Skill => ({ name: "", trigger: "/", description: "", icon: "⚡", prompt: "" });
 
   useEffect(() => {
-    fetch("http://localhost:8000/config/system-prompt")
+    fetch(`${API_BASE}/config/system-prompt`)
       .then(r => r.json()).then(d => { setSystemPrompt(d.content); setSavedPrompt(d.content); }).catch(() => {});
-    fetch("http://localhost:8000/config/context").then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
-    fetch("http://localhost:8000/config/profile").then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
-    fetch("http://localhost:8000/config/settings").then(r => r.json())
+    fetch(`${API_BASE}/config/context`).then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
+    fetch(`${API_BASE}/config/profile`).then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
+    fetch(`${API_BASE}/config/settings`).then(r => r.json())
       .then(d => { setSetSchema(d.schema); setSetValues(d.values); }).catch(() => {});
     fetchSkills();
   }, []);
 
   const saveSettings = async () => {
-    const r = await fetch("http://localhost:8000/config/settings", {
+    const r = await fetch(`${API_BASE}/config/settings`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ values: setValues }),
     });
@@ -58,23 +59,23 @@ export default function ConfigPanel() {
   };
 
   const saveMemory = async () => {
-    await fetch("http://localhost:8000/config/context", {
+    await fetch(`${API_BASE}/config/context`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: context }),
     });
-    await fetch("http://localhost:8000/config/profile", {
+    await fetch(`${API_BASE}/config/profile`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: profile }),
     });
     setMemOk("✓ Enregistré"); setTimeout(() => setMemOk(""), 2000);
   };
 
   const fetchSkills = () => {
-    fetch("http://localhost:8000/config/skills")
+    fetch(`${API_BASE}/config/skills`)
       .then(r => r.json()).then(setSkills).catch(() => {});
   };
 
   const savePrompt = async () => {
     setSaving(true);
-    await fetch("http://localhost:8000/config/system-prompt", {
+    await fetch(`${API_BASE}/config/system-prompt`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: systemPrompt }),
@@ -87,12 +88,12 @@ export default function ConfigPanel() {
 
   const deleteSkill = async (name: string) => {
     if (!confirm(`Supprimer le skill "${name}" ?`)) return;
-    await fetch(`http://localhost:8000/config/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/config/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
     fetchSkills();
   };
 
   const saveSkill = async (skill: Skill) => {
-    await fetch("http://localhost:8000/config/skills", {
+    await fetch(`${API_BASE}/config/skills`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(skill),

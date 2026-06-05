@@ -35,6 +35,26 @@ have() { command -v "$1" &>/dev/null; }
 # Pas de sudo si déjà root (utile en conteneur / CI)
 SUDO="sudo"; [ "$(id -u)" -eq 0 ] && SUDO=""
 
+# ── Détection de ports occupés ────────────────────────────────────
+# Un port déjà pris par un AUTRE service ne doit plus faire planter l'install :
+# on bascule automatiquement sur le prochain port libre.
+port_in_use() {
+    local p="$1"
+    if have ss;   then ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${p}\$"
+    elif have lsof; then lsof -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1
+    else (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null
+    fi
+}
+# Premier port libre à partir d'un port préféré (cherche jusqu'à +50).
+pick_port() {
+    local p="$1" max=$(( $1 + 50 ))
+    while [ "$p" -le "$max" ]; do
+        port_in_use "$p" || { echo "$p"; return 0; }
+        p=$(( p + 1 ))
+    done
+    echo "$1"   # rien de libre trouvé → on garde le préféré
+}
+
 if echo "$DISTRO_IDS" | grep -qiE 'arch'; then
     PKG_FAMILY="arch"
     INSTALL_CMD="$SUDO pacman -S --needed --noconfirm"
@@ -172,6 +192,16 @@ ok "node_modules installé"
 info "Configuration des services systemd…"
 mkdir -p "$HOME/.config/systemd/user"
 
+# Arrêter d'abord NOS services (sinon ils occuperaient « leur » port et seraient
+# détectés comme conflit) ; les ports occupés par d'AUTRES services sont contournés.
+systemctl --user stop mi-saina-backend mi-saina-frontend 2>/dev/null || true
+
+BACKEND_PORT="$(pick_port "${BACKEND_PORT:-8000}")"
+FRONTEND_PORT="$(pick_port "${FRONTEND_PORT:-3001}")"
+[ "$BACKEND_PORT"  != "8000" ] && warn "Port 8000 occupé → backend sur le port $BACKEND_PORT"
+[ "$FRONTEND_PORT" != "3001" ] && warn "Port 3001 occupé → frontend sur le port $FRONTEND_PORT"
+API_BASE_URL="http://localhost:$BACKEND_PORT"
+
 cat > "$HOME/.config/systemd/user/mi-saina-backend.service" <<SVCEOF
 [Unit]
 Description=mi-saina Backend (FastAPI)
@@ -180,7 +210,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR/backend
-ExecStart=$VENV_DIR/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=$VENV_DIR/bin/uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME
@@ -198,10 +228,11 @@ After=mi-saina-backend.service
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR/frontend
-ExecStart=/usr/bin/npm run dev -- --port 3001
+ExecStart=/usr/bin/npm run dev -- --port $FRONTEND_PORT
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME
+Environment=NEXT_PUBLIC_API_BASE=$API_BASE_URL
 
 [Install]
 WantedBy=default.target
@@ -210,12 +241,12 @@ SVCEOF
 systemctl --user daemon-reload
 systemctl --user enable --now mi-saina-backend mi-saina-frontend
 command -v loginctl &>/dev/null && loginctl enable-linger "$USER" 2>/dev/null || true
-ok "Services configurés et démarrés"
+ok "Services configurés et démarrés (backend:$BACKEND_PORT, frontend:$FRONTEND_PORT)"
 
 # ── 9. Vérification ───────────────────────────────────────────────
 sleep 5
-if curl -s http://localhost:8000/health 2>/dev/null | grep -q ok; then
-    ok "Backend actif : http://localhost:8000"
+if curl -s "http://localhost:$BACKEND_PORT/health" 2>/dev/null | grep -q ok; then
+    ok "Backend actif : http://localhost:$BACKEND_PORT"
 else
     warn "Backend pas encore prêt — voir : journalctl --user -u mi-saina-backend -n 50"
 fi
@@ -224,9 +255,9 @@ echo ""
 echo -e "${G}╔══════════════════════════════════════════╗${NC}"
 echo -e "${G}║        ✅ Installation terminée !         ║${NC}"
 echo -e "${G}╠══════════════════════════════════════════╣${NC}"
-echo -e "${G}║  Interface → http://localhost:3001        ║${NC}"
-echo -e "${G}║  API       → http://localhost:8000        ║${NC}"
-echo -e "${G}║  Modèle    → $MODEL${NC}"
+echo -e "${G}  Interface → http://localhost:$FRONTEND_PORT"
+echo -e "${G}  API       → http://localhost:$BACKEND_PORT"
+echo -e "${G}  Modèle    → $MODEL${NC}"
 echo -e "${G}╚══════════════════════════════════════════╝${NC}"
 echo ""
 echo "Commandes utiles :"

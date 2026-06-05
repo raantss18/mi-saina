@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { API_BASE } from "../lib/config";
 
 interface OllamaModel {
   name: string;
@@ -46,7 +47,7 @@ export default function ModelPanel({ onModelChange }: Props) {
 
   const fetchModels = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:8000/models/list");
+      const res = await fetch(`${API_BASE}/models/list`);
       if (res.ok) setModels(await res.json());
     } catch { setError("Backend inaccessible"); }
   }, []);
@@ -58,7 +59,7 @@ export default function ModelPanel({ onModelChange }: Props) {
   }, [fetchModels]);
 
   const handleSelect = async (name: string) => {
-    await fetch("http://localhost:8000/models/select", {
+    await fetch(`${API_BASE}/models/select`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: name }),
@@ -73,7 +74,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     setActionType("delete");
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/models/delete/${encodeURIComponent(name)}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/models/delete/${encodeURIComponent(name)}`, { method: "DELETE" });
       if (!res.ok) {
         const d = await res.json();
         setError(d.detail || "Erreur suppression");
@@ -92,7 +93,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     setPullStatus({ status: isUpdate ? "Vérification des mises à jour..." : "Connexion..." });
 
     try {
-      const es = new EventSource(`http://localhost:8000/models/pull/${encodeURIComponent(modelName)}`);
+      const es = new EventSource(`${API_BASE}/models/pull/${encodeURIComponent(modelName)}`);
       es.onmessage = (e) => {
         try {
           const data = JSON.parse(e.data);
