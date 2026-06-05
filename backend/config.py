@@ -1,8 +1,12 @@
+import json
+import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
 # .env est à la racine du projet (un niveau au-dessus de backend/)
 _ENV_FILE = Path(__file__).parent.parent / ".env"
+# Réglages modifiables à chaud depuis l'UI (persistés ici, hors git)
+_OVERRIDES_FILE = Path(os.path.expanduser("~/.config/mi-saina/settings.json"))
 
 
 class Settings(BaseSettings):
@@ -44,3 +48,109 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+# ── Réglages modifiables à chaud (exposés dans l'UI Config) ────────────────────
+# Chaque entrée décrit le type, les bornes/choix, un libellé et une aide pour l'UI.
+EDITABLE_SETTINGS: dict = {
+    "CONFIRM_MODE": {
+        "type": "choice", "choices": ["risky", "all", "never"],
+        "label": "Confirmation avant exécution",
+        "help": "risky = seulement les commandes destructrices · all = chaque commande · never = jamais "
+                "(les commandes root demandent de toute façon le mot de passe sudo).",
+    },
+    "MAX_AGENT_STEPS": {
+        "type": "int", "min": 1, "max": 20,
+        "label": "Étapes agentiques max",
+        "help": "Nombre max d'allers-retours modèle ↔ commandes par requête.",
+    },
+    "NUM_CTX": {
+        "type": "int", "min": 1024, "max": 32768, "step": 512,
+        "label": "Fenêtre de contexte Ollama (num_ctx)",
+        "help": "Tokens passés au modèle. 8192 ≈ raisonnable sur 8 Go de VRAM ; plus = plus de RAM/VRAM.",
+    },
+    "MAX_CONTEXT_TOKENS": {
+        "type": "int", "min": 1000, "max": 30000, "step": 250,
+        "label": "Budget d'historique (tokens)",
+        "help": "Garde-fou anti-saturation : au-delà, l'historique est élagué (et résumé).",
+    },
+    "CONTEXT_DIGEST": {
+        "type": "bool",
+        "label": "Résumer l'historique élagué",
+        "help": "Insère un résumé des messages élagués au lieu de les couper net.",
+    },
+    "PLANNER_ENABLED": {
+        "type": "bool",
+        "label": "Découpage des tâches lourdes",
+        "help": "Découpe automatiquement les demandes complexes en sous-tâches.",
+    },
+}
+
+
+def _coerce_setting(key: str, value):
+    """Valide et convertit une valeur selon EDITABLE_SETTINGS. Lève ValueError si invalide."""
+    spec = EDITABLE_SETTINGS.get(key)
+    if spec is None:
+        raise ValueError(f"Réglage inconnu ou non modifiable : {key}")
+    t = spec["type"]
+    if t == "choice":
+        if value not in spec["choices"]:
+            raise ValueError(f"{key} doit être l'un de {spec['choices']}")
+        return value
+    if t == "int":
+        try:
+            v = int(value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{key} doit être un entier")
+        if v < spec["min"] or v > spec["max"]:
+            raise ValueError(f"{key} doit être entre {spec['min']} et {spec['max']}")
+        return v
+    if t == "bool":
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "on", "oui")
+        return bool(value)
+    raise ValueError(f"Type non géré pour {key}")
+
+
+def _apply_overrides() -> None:
+    """Applique les réglages persistés (UI) par-dessus l'env/.env, au démarrage."""
+    if not _OVERRIDES_FILE.exists():
+        return
+    try:
+        data = json.loads(_OVERRIDES_FILE.read_text())
+    except Exception:
+        return
+    for key, value in data.items():
+        if key in EDITABLE_SETTINGS:
+            try:
+                setattr(settings, key, _coerce_setting(key, value))
+            except ValueError:
+                continue
+
+
+def current_settings() -> dict:
+    """Valeurs courantes des réglages modifiables (pour l'UI)."""
+    return {key: getattr(settings, key) for key in EDITABLE_SETTINGS}
+
+
+def update_settings(updates: dict) -> dict:
+    """Valide, applique à chaud et persiste un lot de réglages. Retourne l'état courant.
+    Lève ValueError sur la première clé/valeur invalide (rien n'est appliqué)."""
+    coerced = {k: _coerce_setting(k, v) for k, v in updates.items()}
+    for k, v in coerced.items():
+        setattr(settings, k, v)
+    persisted = {}
+    if _OVERRIDES_FILE.exists():
+        try:
+            persisted = json.loads(_OVERRIDES_FILE.read_text())
+        except Exception:
+            persisted = {}
+    persisted.update(coerced)
+    _OVERRIDES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _OVERRIDES_FILE.write_text(json.dumps(persisted, indent=2, ensure_ascii=False))
+    return current_settings()
+
+
+_apply_overrides()

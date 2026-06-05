@@ -14,12 +14,17 @@ export default function ConfigPanel() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savedPrompt, setSavedPrompt] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [tab, setTab] = useState<"prompt" | "skills" | "memory">("prompt");
+  const [tab, setTab] = useState<"prompt" | "skills" | "memory" | "settings">("prompt");
   const [context, setContext] = useState("");
   const [profile, setProfile] = useState("");
   const [memOk, setMemOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
+
+  // Réglages modifiables à chaud
+  const [setSchema, setSetSchema] = useState<Record<string, any>>({});
+  const [setValues, setSetValues] = useState<Record<string, any>>({});
+  const [setOk, setSetOk] = useState("");
 
   // Skill editor
   const [editSkill, setEditSkill] = useState<Skill | null>(null);
@@ -32,8 +37,25 @@ export default function ConfigPanel() {
       .then(r => r.json()).then(d => { setSystemPrompt(d.content); setSavedPrompt(d.content); }).catch(() => {});
     fetch("http://localhost:8000/config/context").then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
     fetch("http://localhost:8000/config/profile").then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
+    fetch("http://localhost:8000/config/settings").then(r => r.json())
+      .then(d => { setSetSchema(d.schema); setSetValues(d.values); }).catch(() => {});
     fetchSkills();
   }, []);
+
+  const saveSettings = async () => {
+    const r = await fetch("http://localhost:8000/config/settings", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values: setValues }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      setSetValues(d.values);
+      setSetOk("✓ Enregistré"); setTimeout(() => setSetOk(""), 2000);
+    } else {
+      const d = await r.json().catch(() => ({}));
+      setSetOk("✗ " + (d.detail || "Erreur")); setTimeout(() => setSetOk(""), 3000);
+    }
+  };
 
   const saveMemory = async () => {
     await fetch("http://localhost:8000/config/context", {
@@ -86,13 +108,13 @@ export default function ConfigPanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6 }}>
-        {(["prompt", "skills", "memory"] as const).map(t => (
+        {(["prompt", "skills", "memory", "settings"] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "4px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11,
             background: tab === t ? "var(--accent)" : "var(--border)",
             border: "none", color: tab === t ? "#000" : "var(--text)", fontWeight: tab === t ? 700 : 400,
           }}>
-            {t === "prompt" ? "System Prompt" : t === "skills" ? "Skills" : "Mémoire"}
+            {t === "prompt" ? "System Prompt" : t === "skills" ? "Skills" : t === "memory" ? "Mémoire" : "Réglages"}
           </button>
         ))}
       </div>
@@ -276,6 +298,66 @@ export default function ConfigPanel() {
             </button>
             {memOk && <span style={{ fontSize: 11, color: "var(--green)" }}>{memOk}</span>}
           </div>
+        </div>
+      )}
+
+      {/* Réglages : comportement de l'agent (appliqués à chaud, persistés) */}
+      {tab === "settings" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+            Appliqués immédiatement et persistés (<code>~/.config/mi-saina/settings.json</code>), sans redémarrage.
+          </div>
+
+          {Object.keys(setSchema).length === 0 && (
+            <div style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: 11 }}>Chargement…</div>
+          )}
+
+          {Object.entries(setSchema).map(([key, spec]: [string, any]) => (
+            <div key={key} style={{
+              display: "flex", flexDirection: "column", gap: 4,
+              padding: "8px 10px", background: "var(--bg)",
+              border: "1px solid var(--border)", borderRadius: 6,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 11, color: "var(--text)", fontWeight: 700, flex: 1 }}>{spec.label}</label>
+
+                {spec.type === "bool" && (
+                  <input type="checkbox" checked={!!setValues[key]}
+                    onChange={e => setSetValues({ ...setValues, [key]: e.target.checked })}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: "var(--accent)" }} />
+                )}
+
+                {spec.type === "choice" && (
+                  <select value={setValues[key] ?? ""}
+                    onChange={e => setSetValues({ ...setValues, [key]: e.target.value })}
+                    style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", padding: "4px 8px", borderRadius: 4, fontSize: 11, outline: "none", cursor: "pointer" }}>
+                    {spec.choices.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                )}
+
+                {spec.type === "int" && (
+                  <input type="number" value={setValues[key] ?? 0}
+                    min={spec.min} max={spec.max} step={spec.step || 1}
+                    onChange={e => setSetValues({ ...setValues, [key]: Number(e.target.value) })}
+                    style={{ width: 90, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", padding: "4px 8px", borderRadius: 4, fontSize: 11, outline: "none", textAlign: "right" }} />
+                )}
+              </div>
+              {spec.help && <div style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.4 }}>{spec.help}</div>}
+              {spec.type === "int" && (
+                <div style={{ fontSize: 9, color: "var(--text-muted)" }}>plage : {spec.min}–{spec.max}</div>
+              )}
+            </div>
+          ))}
+
+          {Object.keys(setSchema).length > 0 && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button onClick={saveSettings}
+                style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                Sauvegarder
+              </button>
+              {setOk && <span style={{ fontSize: 11, color: setOk.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{setOk}</span>}
+            </div>
+          )}
         </div>
       )}
     </div>

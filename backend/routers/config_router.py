@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from config import EDITABLE_SETTINGS, current_settings, update_settings
+
 router = APIRouter()
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
@@ -64,6 +66,27 @@ def get_profile():
 def put_profile(body: TextBody):
     userctx.write_profile(body.content)
     return {"status": "ok"}
+
+
+# ── Réglages modifiables à chaud ───────────────────────────────────────────────
+
+@router.get("/settings")
+def get_settings():
+    """Schéma (libellés/bornes) + valeurs courantes des réglages éditables."""
+    return {"schema": EDITABLE_SETTINGS, "values": current_settings()}
+
+
+class SettingsBody(BaseModel):
+    values: dict
+
+
+@router.put("/settings")
+def put_settings(body: SettingsBody):
+    try:
+        values = update_settings(body.values)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "ok", "values": values}
 
 
 # ── Skills ────────────────────────────────────────────────────────────────────
