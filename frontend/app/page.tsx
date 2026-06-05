@@ -51,6 +51,7 @@ export default function Home() {
   const [sudoPassword, setSudoPassword] = useState("");
   const [pendingCommand, setPendingCommand] = useState("");
   const [confirmCommand, setConfirmCommand] = useState<string | null>(null);
+  const [openChoices, setOpenChoices] = useState<{ command: string; candidates: string[] } | null>(null);
   const [diagnostic, setDiagnostic] = useState<{ label: string; message: string; fix: string | null } | null>(null);
   const [skillSuggestion, setSkillSuggestion] = useState<{ name: string; description: string; commands: string[]; update?: boolean } | null>(null);
   const pendingSkillRef = useRef<string | null>(null);
@@ -111,6 +112,7 @@ export default function Home() {
       if (data.type === "stopped") {
         setStreaming(false);
         setSudoModal(false);   // au cas où le ⏹ global a été cliqué pendant l'attente sudo
+        setOpenChoices(null);
         setTaskStatus("stopped");
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -242,6 +244,12 @@ export default function Home() {
         return;
       }
 
+      // Ouverture ambiguë : plusieurs fichiers proches → liste cliquable
+      if (data.type === "open_choices") {
+        setOpenChoices({ command: data.command, candidates: data.candidates || [] });
+        return;
+      }
+
       // L'utilisateur a refusé une commande → trace dans le fil
       if (data.type === "exec_declined") {
         setMessages(prev => [...prev, {
@@ -339,9 +347,15 @@ export default function Home() {
     if (last) navigator.clipboard.writeText(last.content);
   };
 
-  const respondConfirm = (approved: boolean) => {
-    wsRef.current?.send(JSON.stringify({ type: "exec_response", approved }));
+  const respondConfirm = (approved: boolean, all = false) => {
+    wsRef.current?.send(JSON.stringify({ type: "exec_response", approved, all }));
     setConfirmCommand(null);
+  };
+
+  // Choix d'un fichier parmi plusieurs candidats à l'ouverture (null = annuler)
+  const respondOpenChoice = (path: string | null) => {
+    wsRef.current?.send(JSON.stringify({ type: "open_choice_response", path }));
+    setOpenChoices(null);
   };
 
   // Enregistrer la tâche réussie comme compétence réutilisable (/slash)
@@ -750,6 +764,43 @@ export default function Home() {
               <button onClick={() => respondConfirm(true)}
                 style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 Exécuter
+              </button>
+              <button onClick={() => respondConfirm(true, true)}
+                title="Approuver cette commande et toutes les suivantes de cette tâche"
+                style={{ background: "rgba(63,185,80,0.2)", border: "1px solid var(--green)", color: "var(--green)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                Tout valider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ouverture ambiguë : choisir un fichier parmi les candidats */}
+      {openChoices !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24, minWidth: 420, maxWidth: 720 }}>
+            <div style={{ color: "var(--accent)", marginBottom: 4, fontSize: 13, fontWeight: 700 }}>📂 Quel fichier ouvrir ?</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>
+              Plusieurs fichiers correspondent — choisis :
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 320, overflowY: "auto" }}>
+              {openChoices.candidates.map((path, i) => (
+                <button key={i} onClick={() => respondOpenChoice(path)}
+                  style={{
+                    textAlign: "left", background: "var(--bg)", border: "1px solid var(--border)",
+                    color: "var(--text)", padding: "8px 10px", borderRadius: 4, cursor: "pointer",
+                    fontSize: 12, fontFamily: "monospace", wordBreak: "break-all",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--accent)")}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}>
+                  {path}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+              <button onClick={() => respondOpenChoice(null)}
+                style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
+                Annuler
               </button>
             </div>
           </div>

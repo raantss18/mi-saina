@@ -191,6 +191,61 @@ def _resolve_file(path: str) -> str | None:
     return None
 
 
+_OPEN_LAUNCHERS = ("xdg-open", "kde-open", "kde-open5", "gio")
+
+
+def _resolve_file_candidates(path: str, limit: int = 8, threshold: float = 0.55) -> list[str]:
+    """Plusieurs fichiers proches du chemin demandé (inexistant), triés du plus
+    pertinent au moins pertinent. Sert à proposer une liste cliquable plutôt que
+    de choisir à l'aveugle. Liste vide si aucun candidat correct."""
+    p = os.path.expanduser(path)
+    if "://" in path:
+        return []
+    d = os.path.dirname(p)
+    if not os.path.isdir(d):
+        d = os.path.expanduser("~/Documents") if "Documents" in p else os.path.expanduser("~")
+    name = _norm_name(os.path.basename(p))
+    if not name:
+        return []
+    try:
+        entries = os.listdir(d)
+    except OSError:
+        return []
+    scored = []
+    for e in entries:
+        r = difflib.SequenceMatcher(None, name, _norm_name(e)).ratio()
+        # bonus si le nom demandé est contenu dans l'entrée (sous-chaîne)
+        if name in _norm_name(e):
+            r = max(r, 0.9)
+        if r >= threshold:
+            scored.append((r, os.path.join(d, e)))
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [path for _, path in scored[:limit]]
+
+
+def open_choice_candidates(cmd: str) -> list[str]:
+    """Si `cmd` ouvre un fichier dont le chemin n'existe pas ET qu'il y a PLUSIEURS
+    candidats plausibles, retourne la liste (pour proposer un choix cliquable).
+    Retourne [] s'il n'y a pas d'ambiguïté (0 ou 1 candidat) — on laisse alors le
+    flux normal (auto-réparation / erreur) opérer."""
+    inner = sanitize(cmd).rstrip("&").strip()
+    if _command_head(inner) not in _OPEN_LAUNCHERS:
+        return []
+    try:
+        toks = shlex.split(inner)
+    except ValueError:
+        return []
+    if len(toks) < 2:
+        return []
+    arg = toks[-1]
+    if not (arg.startswith("/") or arg.startswith("~") or arg.startswith("./")):
+        return []
+    if os.path.exists(os.path.expanduser(arg)):
+        return []
+    cands = _resolve_file_candidates(arg)
+    return cands if len(cands) >= 2 else []
+
+
 def _repair_open_command(inner: str) -> tuple[str, str | None]:
     """Pour un lanceur de fichier (xdg-open/kde-open/gio open), corrige le chemin
     s'il n'existe pas. Retourne (commande_éventuellement_corrigée, chemin_corrigé|None)."""
@@ -323,6 +378,12 @@ async def stream_pty(
 
     # ── Application graphique : lancer détaché + remonter les erreurs ──────
     if is_gui_command(cmd):
+        # Ouverture ambiguë (plusieurs fichiers proches) → proposer un choix
+        # cliquable plutôt que de deviner.
+        choices = open_choice_candidates(cmd)
+        if choices:
+            yield {"type": "open_choices", "command": cmd, "candidates": choices}
+            return
         async for ev in launch_gui(cmd):
             yield ev
         return

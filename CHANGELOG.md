@@ -2,6 +2,11 @@
 
 ## [Non publié]
 
+### Ajouté
+- **Liste cliquable à l'ouverture ambiguë** : quand on demande d'ouvrir un fichier dont le chemin n'existe pas mais que **plusieurs** fichiers proches existent, mi-saina ne devine plus — il propose une **liste cliquable** (modal). L'ouverture se fait sur le fichier choisi. S'il n'y a 0 ou 1 candidat, le flux normal (auto-réparation) opère. Round-trip backend interruptible par ⏹ (comme la fenêtre sudo). Couvert par `tests/test_shell_open_choices.py`.
+- **Bouton « Tout valider »** dans la fenêtre de confirmation : approuve la commande **et toutes les suivantes de la tâche en cours** (utile en mode `CONFIRM_MODE=all` ou pour une tâche multi-commandes risquées). Couvert par `tests/test_chat_confirm.py`.
+- **Tests shell_stream** complétés (GUI `launch_gui`, auto-réparation de chemin) — `tests/test_shell_repair.py`.
+
 ### Corrigé
 - **Timeout shell tuant les longues commandes (maj système, gros téléchargements)** : `stream_pty` coupait toute commande après **600 s de temps total**, ce qui interrompait un `paru -Syu` de plusieurs Go en plein milieu. Le timeout est désormais basé sur l'**inactivité** : on ne coupe que si la commande ne produit **aucune sortie** pendant `SHELL_IDLE_TIMEOUT` (défaut 600 s, réglable dans l'UI Config). Un téléchargement qui progresse sort en continu → jamais coupé tant qu'il avance (⏹ reste disponible pour arrêter à la main). De plus, l'arrêt sur timeout tue désormais tout le **groupe de processus** (`killpg`/SIGKILL) au lieu du seul shell, pour ne pas laisser `pacman` orphelin. NB : pacman met les paquets complets en cache (`/var/cache/pacman/pkg`), donc une reprise ne re-télécharge que le paquet interrompu.
 

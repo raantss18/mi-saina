@@ -1,5 +1,6 @@
 import asyncio
 import re
+import shlex
 from pathlib import Path
 import json
 
@@ -132,6 +133,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
     # Séparer la réponse sudo évite que _route_stdin "mange" le mot de passe.
     stdin_q: asyncio.Queue[str] = asyncio.Queue()
     sudo_q: asyncio.Queue[dict] = asyncio.Queue()
+    choice_q: asyncio.Queue[dict] = asyncio.Queue()   # réponse au choix d'ouverture
     stop_event = asyncio.Event()   # « stop » → tue le processus du terminal
 
     # Tâche qui draine ws_queue pour router shell_stdin / sudo_response pendant l'exécution
@@ -147,6 +149,8 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                     await stdin_q.put(p.get("text", ""))
                 elif p.get("type") == "sudo_response":
                     await sudo_q.put(p)
+                elif p.get("type") == "open_choice_response":
+                    await choice_q.put(p)
                 elif p.get("type") == "stop":
                     stop_event.set()    # signale stream_pty pour tuer le process
                     return
@@ -210,6 +214,39 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                 return "", -1, False, {"status": "failure", "rc": -1,
                                        "logical": False,
                                        "reason": "Timeout — mot de passe non fourni"}
+
+            elif event["type"] == "open_choices":
+                # Ouverture ambiguë : proposer une liste cliquable plutôt que choisir.
+                await websocket.send_text(json.dumps({
+                    "type": "open_choices", "command": cmd,
+                    "candidates": event["candidates"],
+                }))
+                get_choice = asyncio.create_task(choice_q.get())
+                on_stop = asyncio.create_task(stop_event.wait())
+                done_set, _ = await asyncio.wait(
+                    {get_choice, on_stop}, timeout=120.0,
+                    return_when=asyncio.FIRST_COMPLETED)
+                for t in (get_choice, on_stop):
+                    if not t.done():
+                        t.cancel()
+
+                chosen = get_choice.result().get("path") if get_choice in done_set else None
+                if not chosen:
+                    # Stop / annulation / timeout → ne rien ouvrir.
+                    reason = ("Arrêté" if on_stop in done_set
+                              else "Aucun fichier choisi")
+                    await websocket.send_text(json.dumps({
+                        "type": "shell_done", "command": cmd, "returncode": -1,
+                        "status": "stopped", "logical_failure": False,
+                        "status_reason": reason,
+                    }))
+                    return "", -1, (on_stop in done_set), {
+                        "status": "failure", "rc": -1, "logical": False, "reason": reason}
+
+                # Relancer l'ouverture sur le fichier choisi (chemin existant).
+                routing_task.cancel()
+                new_cmd = f"xdg-open {shlex.quote(chosen)}"
+                return await _exec_streaming(new_cmd, websocket, ws_queue, _started=True)
 
             elif event["type"] == "chunk":
                 captured.append(event["text"])
@@ -284,11 +321,18 @@ def _slugify(text: str, max_words: int = 4) -> str:
     return slug or "tache"
 
 
-async def _await_confirm(cmd: str, websocket: WebSocket, queue: asyncio.Queue) -> bool:
+async def _await_confirm(cmd: str, websocket: WebSocket, queue: asyncio.Queue,
+                         approve_all: dict | None = None) -> bool:
     """Demande à l'utilisateur d'approuver une commande avant de l'exécuter.
+
+    `approve_all` : conteneur mutable partagé sur tout le tour. Si l'utilisateur a
+    cliqué « Tout valider », `approve_all["on"]` passe à True et les commandes
+    suivantes du tour sont approuvées sans nouvelle fenêtre.
 
     Retourne True si approuvée, False si refusée / déconnecté / stop.
     """
+    if approve_all and approve_all.get("on"):
+        return True
     await websocket.send_text(json.dumps({"type": "confirm_exec", "command": cmd}))
     while True:
         raw = await queue.get()
@@ -300,7 +344,11 @@ async def _await_confirm(cmd: str, websocket: WebSocket, queue: asyncio.Queue) -
             continue
         t = p.get("type")
         if t == "exec_response":
-            return bool(p.get("approved"))
+            approved = bool(p.get("approved"))
+            # « Tout valider » → mémoriser pour les commandes suivantes du tour
+            if approved and p.get("all") and approve_all is not None:
+                approve_all["on"] = True
+            return approved
         if t == "stop":
             return False
         # autres messages ignorés pendant l'attente de confirmation
@@ -398,11 +446,13 @@ async def _inject_redirects(redirects: list[str], messages: list, websocket: Web
 
 async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
-                          persist: bool = True) -> tuple[bool, str, list[tuple[str, int]]]:
+                          persist: bool = True,
+                          approve_all: dict | None = None) -> tuple[bool, str, list[tuple[str, int]]]:
     """Boucle agentique sur `messages` (modèle → commandes → résultat → modèle).
 
     Retourne (stoppé, dernière_réponse, commandes_exécutées[(cmd, rc)]).
     `persist=False` pour un sous-agent à contexte éphémère.
+    `approve_all` : conteneur partagé pour le « Tout valider » du tour.
     """
     stopped = False
     last = ""
@@ -444,7 +494,7 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
             # (Les commandes root sont de toute façon validées par le mot de passe sudo.)
             need_confirm = settings.CONFIRM_MODE == "all" or (
                 settings.CONFIRM_MODE == "risky" and is_destructive(cmd))
-            if need_confirm and not await _await_confirm(cmd, websocket, queue):
+            if need_confirm and not await _await_confirm(cmd, websocket, queue, approve_all):
                 await websocket.send_text(json.dumps({"type": "exec_declined", "command": cmd}))
                 results.append((cmd, "(commande refusée par l'utilisateur)", -1))
                 declined = True
@@ -491,7 +541,7 @@ async def chat_ws(websocket: WebSocket):
             msg_type = payload.get("type", "chat")
 
             # Messages de contrôle hors contexte
-            if msg_type in ("stop", "ping", "shell_stdin", "sudo_response", "exec_response"):
+            if msg_type in ("stop", "ping", "shell_stdin", "sudo_response", "exec_response", "open_choice_response"):
                 continue
 
             user_input = payload.get("message", "")
@@ -525,6 +575,7 @@ async def chat_ws(websocket: WebSocket):
             # ── Tâche lourde → planifier puis exécuter en sous-agents (contexte frais) ──
             stopped = False
             executed: list[tuple[str, int]] = []
+            approve_all = {"on": False}   # « Tout valider » : partagé sur tout le tour
             if should_plan(user_input):
                 await websocket.send_text(json.dumps({"type": "planning"}))
                 subtasks = await plan_task(user_input)
@@ -553,7 +604,8 @@ async def chat_ws(websocket: WebSocket):
                     sub_msgs.append({"role": "user",
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
                     stopped, last, ex = await _run_agent_loop(
-                        sub_msgs, task_type, websocket, queue, session_id, persist=True)
+                        sub_msgs, task_type, websocket, queue, session_id, persist=True,
+                        approve_all=approve_all)
                     executed += ex
                     if stopped:
                         break
@@ -567,7 +619,8 @@ async def chat_ws(websocket: WebSocket):
                 # Chemin simple : contexte complet (avec mémoire), élagué au budget
                 messages = _build_messages(history, subtasks[0], memory_context, attachments)
                 stopped, _, executed = await _run_agent_loop(
-                    messages, task_type, websocket, queue, session_id, persist=True)
+                    messages, task_type, websocket, queue, session_id, persist=True,
+                    approve_all=approve_all)
 
             # ── Auto-correction d'une compétence : la compétence a échoué puis été corrigée ──
             if (skill_name and not stopped and executed
