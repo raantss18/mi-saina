@@ -21,6 +21,8 @@ interface Message {
   command?: string;
   status?: string;
   returncode?: number;
+  logicalFailure?: boolean;
+  statusReason?: string;
   attachments?: Attachment[];
 }
 
@@ -165,13 +167,17 @@ export default function Home() {
 
       // Commande terminée
       if (data.type === "shell_done") {
-        if (data.returncode !== 0 && data.returncode !== undefined) turnFailureRef.current = true;
+        // Échec franc (rc≠0) OU échec logique (rc=0 mais sortie en erreur)
+        const failed = data.status ? data.status === "failure"
+                                   : (data.returncode !== 0 && data.returncode !== undefined);
+        if (failed) turnFailureRef.current = true;
+        const extra = { logicalFailure: !!data.logical_failure, statusReason: data.status_reason };
         setMessages(prev => {
           const idx = [...prev].reverse().findIndex(m => m.role === "shell" && m.command === data.command && !m.shellDone);
-          if (idx === -1) return [...prev, { role: "shell", command: data.command, content: data.error || "", shellDone: true, shellStreaming: false, returncode: data.returncode }];
+          if (idx === -1) return [...prev, { role: "shell", command: data.command, content: data.error || "", shellDone: true, shellStreaming: false, returncode: data.returncode, ...extra }];
           const realIdx = prev.length - 1 - idx;
           const updated = [...prev];
-          updated[realIdx] = { ...updated[realIdx], shellDone: true, shellStreaming: false, returncode: data.returncode, waitingInput: false, error: data.error };
+          updated[realIdx] = { ...updated[realIdx], shellDone: true, shellStreaming: false, returncode: data.returncode, waitingInput: false, error: data.error, ...extra };
           return updated;
         });
         setStreaming(false);

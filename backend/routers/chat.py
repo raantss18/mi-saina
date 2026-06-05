@@ -106,19 +106,22 @@ async def _ws_reader(websocket: WebSocket, queue: asyncio.Queue):
 
 async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queue,
                           sudo_password: str | None = None,
-                          _started: bool = False) -> tuple[str, int, bool]:
+                          _started: bool = False) -> tuple[str, int, bool, dict]:
     """Lance cmd en PTY, stream la sortie via WS, route stdin depuis ws_queue.
 
-    Retourne (sortie_capturée, returncode) pour permettre à la boucle agentique
-    de renvoyer le résultat au modèle (find → ouvrir, etc.).
+    Retourne (sortie_capturée, returncode, stoppé, outcome) pour permettre à la
+    boucle agentique de renvoyer le résultat au modèle (find → ouvrir, etc.).
+    `outcome` croise code retour ET sortie (cf. diagnostics.assess_outcome) afin
+    de repérer les échecs logiques renvoyant pourtant 0.
     `_started` : interne — évite de recréer un bloc terminal lors du relancement sudo.
     """
 
     if not cmd.strip():
-        return "", 0, False
+        return "", 0, False, {"status": "success", "rc": 0, "logical": False, "reason": None}
 
     captured: list[str] = []
     returncode = -1
+    outcome: dict = {"status": "success", "rc": 0, "logical": False, "reason": None}
     stopped = False
     diag_buffer = ""           # fenêtre glissante pour la vigilance temps réel
     diag_seen: set[str] = set()
@@ -178,9 +181,13 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                 except asyncio.TimeoutError:
                     await websocket.send_text(json.dumps({
                         "type": "shell_done", "command": cmd, "returncode": -1,
+                        "status": "failure", "logical_failure": False,
+                        "status_reason": "Timeout — mot de passe non fourni",
                         "error": "Timeout — mot de passe non fourni"
                     }))
-                return "", -1, False
+                return "", -1, False, {"status": "failure", "rc": -1,
+                                       "logical": False,
+                                       "reason": "Timeout — mot de passe non fourni"}
 
             elif event["type"] == "chunk":
                 captured.append(event["text"])
@@ -209,19 +216,29 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
 
             elif event["type"] == "done":
                 returncode = event["returncode"]
+                # Statut fin : croiser code retour ET sortie (échec logique malgré rc=0)
+                outcome = diagnostics.assess_outcome("".join(captured), returncode)
                 await websocket.send_text(json.dumps({
                     "type": "shell_done",
                     "command": cmd,
                     "returncode": event["returncode"],
+                    "status": outcome["status"],
+                    "logical_failure": outcome["logical"],
+                    "status_reason": outcome["reason"],
                 }))
 
             elif event["type"] == "error":
                 returncode = -1
                 captured.append(event.get("message", "Erreur"))
+                outcome = {"status": "failure", "rc": -1, "logical": False,
+                           "reason": event.get("message", "Erreur")}
                 await websocket.send_text(json.dumps({
                     "type": "shell_done",
                     "command": cmd,
                     "returncode": -1,
+                    "status": "failure",
+                    "logical_failure": False,
+                    "status_reason": event.get("message", "Erreur"),
                     "error": event.get("message", "Erreur"),
                 }))
 
@@ -232,7 +249,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
         except asyncio.CancelledError:
             pass
 
-    return "".join(captured), returncode, stop_event.is_set()
+    return "".join(captured), returncode, stop_event.is_set(), outcome
 
 
 _MAX_FEEDBACK_CHARS = 4000  # tronquage de la sortie renvoyée au modèle
@@ -271,13 +288,19 @@ def _format_exec_feedback(results: list[tuple[str, str, int]]) -> str:
     """Met en forme la sortie des commandes pour la renvoyer au modèle."""
     parts = []
     diags: list[dict] = []
+    outcome_notes: list[str] = []
     for cmd, out, rc in results:
         out = out.strip()
         diags += diagnostics.diagnose(out)
+        note = diagnostics.format_outcome_for_model(diagnostics.assess_outcome(out, rc))
+        if note:
+            outcome_notes.append(note)
         if len(out) > _MAX_FEEDBACK_CHARS:
             out = out[:_MAX_FEEDBACK_CHARS] + "\n[…sortie tronquée…]"
         parts.append(f"$ {cmd}\n(code retour: {rc})\n{out or '(aucune sortie)'}")
     body = "\n\n".join(parts)
+    if outcome_notes:
+        body += "\n\n" + "\n".join(outcome_notes)
     diag_text = diagnostics.format_for_model(diags)
     if diag_text:
         body += "\n\n" + diag_text
@@ -446,9 +469,12 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 results.append((cmd, "(commande refusée par l'utilisateur)", -1))
                 declined = True
                 continue
-            out, rc, was_stopped = await _exec_streaming(cmd, websocket, queue)
+            out, rc, was_stopped, outcome = await _exec_streaming(cmd, websocket, queue)
             results.append((cmd, out, rc))
-            executed.append((cmd, rc))
+            # Statut effectif : un échec logique (rc=0 mais sortie en erreur) compte
+            # comme un échec pour l'apprentissage de compétences et le statut de tâche.
+            effective_rc = 0 if outcome["status"] == "success" else (rc or 1)
+            executed.append((cmd, effective_rc))
             if was_stopped:
                 # L'utilisateur a coupé l'exécution → on arrête toute la tâche
                 stopped = True

@@ -253,6 +253,63 @@ _RULES = [
 ]
 
 
+# ── Détection de statut fine ─────────────────────────────────────────────────
+# Certains outils renvoient un code retour 0 alors que la tâche a logiquement
+# échoué (suites de tests, linters, compilateurs lancés via un wrapper…).
+# On analyse donc AUSSI le texte de la sortie, pas seulement le code retour.
+
+# Motifs forts d'échec logique : leur présence trahit un échec même si rc == 0.
+# On reste conservateur (signaux peu ambigus) pour limiter les faux positifs.
+_LOGICAL_FAILURE = [
+    _r(r"traceback \(most recent call last\)"),          # exception Python non rattrapée
+    _r(r"\bpanic:\s"),                                    # Go / Rust panic
+    _r(r"segmentation fault|core dumped"),
+    _r(r"\b[1-9]\d*\s+(?:tests?|specs?|examples?|checks?|assertions?)\s+(?:failed|failing)\b"),
+    _r(r"\b[1-9]\d*\s+failures?\b"),                      # rspec « 1 failure »
+    _r(r"\b(?:tests?:\s+)?[1-9]\d*\s+failing\b"),         # mocha
+    _r(r"\btests?:\s+(?:[^\n]*,\s*)?[1-9]\d*\s+failed"),  # jest / vitest
+    _r(r"=+\s*[1-9]\d*\s+failed"),                        # pytest « == 3 failed == »
+    _r(r"(?m)^FAILED\s"),                                 # pytest ligne « FAILED tests/… »
+    _r(r"\bbuild failed\b|compilation (?:failed|terminated)"),
+    _r(r"✖\s*[1-9]\d*\s+problems?\s*\([1-9]\d*\s+errors?"),  # eslint
+    _r(r"\b[1-9]\d*\s+errors?\b"),                        # « 5 errors » (zéros neutralisés en amont)
+    _r(r"(?:^|[\s:])error(?:\[[0-9A-Z]|:\s)"),            # gcc/clang/rust : « : error: », « error[E…] »
+    _r(r"(?:^|[\s:])erreur\s*:\s"),
+    _r(r"❌|✘|✗"),
+]
+
+# Phrases « à zéro » / succès qui annulent un faux positif (retirées avant le scan).
+_ZERO_NOISE = _r(
+    r"\b0\s+errors?\b|\bno errors?\b|\baucune erreur\b|"
+    r"\b0\s+(?:failed|failures?|failing)\b|\bno (?:failures?|tests? failed)\b|"
+    r"\berrors?:\s*0\b|\bfailures?:\s*0\b|\bfailed:\s*0\b|"
+    r"\b0\s+(?:tests?|specs?|examples?)\s+(?:failed|failing)\b"
+)
+
+
+def assess_outcome(text: str, returncode: int | None) -> dict:
+    """Statut réel d'une commande, en croisant code retour ET sortie.
+
+    Retourne {"status": "success"|"failure", "rc": int, "logical": bool,
+              "reason": str|None}. `logical=True` ⇒ échec détecté dans le texte
+    malgré un code retour 0.
+    """
+    rc = returncode if returncode is not None else -1
+    # Échec franc : code retour non nul.
+    if rc != 0:
+        return {"status": "failure", "rc": rc, "logical": False,
+                "reason": f"code retour {rc}"}
+    # Code retour 0 : chercher un échec logique dans la sortie.
+    cleaned = _ZERO_NOISE.sub(" ", text or "")
+    for rule in _LOGICAL_FAILURE:
+        m = rule.search(cleaned)
+        if m:
+            snippet = re.sub(r"\s+", " ", m.group(0)).strip()[:60]
+            return {"status": "failure", "rc": 0, "logical": True,
+                    "reason": f"sortie suspecte malgré rc=0 : « {snippet} »"}
+    return {"status": "success", "rc": 0, "logical": False, "reason": None}
+
+
 def diagnose(text: str) -> list[dict]:
     """Retourne les diagnostics détectés dans `text` (sans doublon de libellé)."""
     found: list[dict] = []
@@ -280,3 +337,12 @@ def format_for_model(diags: list[dict]) -> str:
         lines.append(line)
     lines.append("Propose à l'utilisateur la commande corrective adaptée (via [EXEC: …]).")
     return "\n".join(lines)
+
+
+def format_outcome_for_model(outcome: dict) -> str:
+    """Avertissement injecté quand la sortie révèle un échec logique malgré rc=0."""
+    if not outcome.get("logical"):
+        return ""
+    return ("[STATUT — échec logique détecté] La commande a renvoyé un code retour 0 "
+            f"mais sa sortie indique un échec ({outcome['reason']}). Ne considère PAS "
+            "cette étape comme réussie : analyse la cause et corrige avant de continuer.")

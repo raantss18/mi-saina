@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0] - 2026-06-05
+
+### Ajouté
+- **Détection de statut fine** : le succès/échec d'une commande ne dépend plus du seul code retour. `diagnostics.assess_outcome()` analyse aussi la **sortie** pour repérer les **échecs logiques renvoyant pourtant 0** (suites de tests « N failed / failing », `Traceback`, `panic:`, `BUILD FAILED`, `error:` gcc/clang/rust, eslint « ✖ N problems (N errors) », rspec…), avec garde anti-faux-positifs (« 0 errors », « no failures », « all tests passed »…). L'échec logique est affiché dans le terminal (« ✗ échec logique (rc=0) » + raison), injecté au modèle pour qu'il corrige, et compté comme échec pour l'apprentissage de compétences. Couvert par `tests/test_diagnostics.py`.
+
 ## [1.5.0] - 2026-06-04
 
 ### Ajouté

@@ -10,6 +10,8 @@ export interface ShellEntry {
   waitingInput?: boolean;
   returncode?: number;
   error?: string;
+  logicalFailure?: boolean;
+  statusReason?: string;
 }
 
 export type TaskStatus = "idle" | "running" | "success" | "failure" | "stopped";
@@ -84,19 +86,29 @@ export default function TerminalPanel({
         )}
         {entries.map((e, i) => {
           const done = e.shellDone;
-          const ok = done && e.returncode === 0;
-          const failed = done && e.returncode !== 0 && e.returncode !== undefined;
+          // Échec logique : code retour 0 mais sortie en erreur (tests, linter…)
+          const logicalFail = done && e.logicalFailure;
+          const failed = done && ((e.returncode !== 0 && e.returncode !== undefined) || logicalFail);
+          const ok = done && !failed;
           const running = e.shellStreaming && !done;
           const color = running ? "var(--accent)" : ok ? "var(--green)" : failed ? "var(--red)" : "var(--text-muted)";
+          const statusLabel = running ? "en cours…"
+            : !done ? ""
+            : ok ? "succès"
+            : logicalFail ? "échec logique (rc=0)"
+            : `échec (rc=${e.returncode})`;
           return (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 6, alignItems: "center", color }}>
                 <span>{running ? "⟳" : ok ? "✓" : failed ? "✗" : "•"}</span>
                 <span style={{ color: "var(--yellow)", wordBreak: "break-all", flex: 1 }}>$ {e.command}</span>
-                <span style={{ fontSize: 10 }}>
-                  {running ? "en cours…" : done ? (ok ? "succès" : `échec (rc=${e.returncode})`) : ""}
-                </span>
+                <span style={{ fontSize: 10 }}>{statusLabel}</span>
               </div>
+              {logicalFail && e.statusReason && (
+                <div style={{ margin: "2px 0 0 16px", color: "var(--red)", fontSize: 10 }}>
+                  ⚠ {e.statusReason}
+                </div>
+              )}
               {e.content && (
                 <pre style={{
                   margin: "3px 0 0 16px", whiteSpace: "pre-wrap", wordBreak: "break-word",
