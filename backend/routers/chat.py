@@ -171,20 +171,44 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                 # Demander le mot de passe au frontend.
                 # La réponse arrive via sudo_q, alimentée par _route_stdin (pas de race).
                 await websocket.send_text(json.dumps({"type": "needs_sudo", "command": cmd}))
-                try:
-                    p = await asyncio.wait_for(sudo_q.get(), timeout=120.0)
+                # Le PTY a rendu la main (générateur terminé) : on attend le mot de
+                # passe MAIS on doit aussi pouvoir être interrompu par un « stop »
+                # ou une déconnexion. _route_stdin met stop_event dans les deux cas.
+                get_pw = asyncio.create_task(sudo_q.get())
+                on_stop = asyncio.create_task(stop_event.wait())
+                done_set, _ = await asyncio.wait(
+                    {get_pw, on_stop}, timeout=120.0,
+                    return_when=asyncio.FIRST_COMPLETED)
+                for t in (get_pw, on_stop):
+                    if not t.done():
+                        t.cancel()
+
+                if on_stop in done_set:
+                    # Stop / déconnexion pendant l'attente du mot de passe.
+                    await websocket.send_text(json.dumps({
+                        "type": "shell_done", "command": cmd, "returncode": -1,
+                        "status": "stopped", "logical_failure": False,
+                        "status_reason": "Arrêté pendant l'attente du mot de passe",
+                    }))
+                    return "", -1, True, {"status": "failure", "rc": -1,
+                                          "logical": False,
+                                          "reason": "Arrêté pendant l'attente du mot de passe"}
+
+                if get_pw in done_set:
+                    p = get_pw.result()
                     # Relancer avec le mot de passe (le routing actuel est arrêté
                     # puis recréé par l'appel récursif).
                     routing_task.cancel()
                     return await _exec_streaming(cmd, websocket, ws_queue,
                                                  p.get("password"), _started=True)
-                except asyncio.TimeoutError:
-                    await websocket.send_text(json.dumps({
-                        "type": "shell_done", "command": cmd, "returncode": -1,
-                        "status": "failure", "logical_failure": False,
-                        "status_reason": "Timeout — mot de passe non fourni",
-                        "error": "Timeout — mot de passe non fourni"
-                    }))
+
+                # Ni stop ni mot de passe → timeout.
+                await websocket.send_text(json.dumps({
+                    "type": "shell_done", "command": cmd, "returncode": -1,
+                    "status": "failure", "logical_failure": False,
+                    "status_reason": "Timeout — mot de passe non fourni",
+                    "error": "Timeout — mot de passe non fourni"
+                }))
                 return "", -1, False, {"status": "failure", "rc": -1,
                                        "logical": False,
                                        "reason": "Timeout — mot de passe non fourni"}

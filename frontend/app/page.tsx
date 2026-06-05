@@ -110,6 +110,7 @@ export default function Home() {
 
       if (data.type === "stopped") {
         setStreaming(false);
+        setSudoModal(false);   // au cas où le ⏹ global a été cliqué pendant l'attente sudo
         setTaskStatus("stopped");
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -180,7 +181,9 @@ export default function Home() {
           updated[realIdx] = { ...updated[realIdx], shellDone: true, shellStreaming: false, returncode: data.returncode, waitingInput: false, error: data.error, ...extra };
           return updated;
         });
-        setStreaming(false);
+        // NB : ne PAS couper `streaming` ici — la boucle agentique continue
+        // (le modèle reçoit la sortie et peut enchaîner). Seuls `done`/`stopped`
+        // terminent le tour et remettent streaming à false.
         return;
       }
 
@@ -708,7 +711,7 @@ export default function Home() {
               style={{ width: "100%", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: 8, borderRadius: 4, fontSize: 13, outline: "none", fontFamily: "inherit" }}
             />
             <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
-              <button onClick={() => { setSudoModal(false); setSudoPassword(""); }}
+              <button onClick={() => { setSudoModal(false); setSudoPassword(""); setPendingCommand(""); stopGeneration(); }}
                 style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12 }}>
                 Annuler
               </button>

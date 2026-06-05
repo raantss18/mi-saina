@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-06-05
+
+### Corrigé
+- **`stop` pendant l'attente du mot de passe sudo** : une fois le prompt sudo affiché, le PTY avait rendu la main et l'attente du mot de passe (`sudo_q.get()`) n'écoutait plus le signal d'arrêt → un clic sur ⏹ (ou une déconnexion) restait sans effet jusqu'au timeout de 120 s. L'attente du mot de passe court désormais contre `stop_event` (`asyncio.wait` / FIRST_COMPLETED) : un stop ou une déconnexion interrompt immédiatement (le terminal passe en `stopped` et la tâche s'arrête). Le bouton « Annuler » du modal sudo envoie maintenant un vrai `stop` au backend. Couvert par `tests/test_chat_sudo.py`.
+- **Bouton ⏹ qui disparaissait en plein milieu d'une tâche** : l'état `streaming` du frontend retombait à `false` dès qu'une commande se terminait (`shell_done`), alors que la boucle agentique continuait (réinjection de la sortie au modèle, commandes suivantes). `shell_done` ne modifie plus `streaming` ; seuls les events terminaux `done`/`stopped` le remettent à false.
+
 ## [1.6.0] - 2026-06-05
 
 ### Ajouté
