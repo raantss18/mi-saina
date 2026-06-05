@@ -30,13 +30,6 @@ function ShellStreamBlock({
   onInput?: (text: string) => void;
 }) {
   const [inputVal, setInputVal] = useState("");
-  const preRef = useRef<HTMLPreElement>(null);
-
-  useEffect(() => {
-    if (preRef.current) {
-      preRef.current.scrollTop = preRef.current.scrollHeight;
-    }
-  }, [msg.content]);
 
   const done = msg.shellDone;
   const rc = msg.returncode;
@@ -84,24 +77,15 @@ function ShellStreamBlock({
         )}
       </div>
 
-      {/* Output */}
-      <pre ref={preRef} style={{
-        margin: 0, padding: "8px 12px",
-        color: "var(--text)", fontSize: 11,
-        whiteSpace: "pre-wrap", wordBreak: "break-word",
-        maxHeight: 400, overflowY: "auto",
-        lineHeight: 1.45,
+      {/* Résumé compact (la sortie complète est dans le panneau ▣ Terminal) */}
+      <div style={{
+        padding: "6px 12px", fontSize: 11, color: "var(--text-muted)",
+        display: "flex", alignItems: "center", gap: 6,
       }}>
-        {msg.content || " "}
-        {running && !done && <span style={{ color: "var(--accent)", animation: "blink 0.8s step-end infinite" }}>▋</span>}
-      </pre>
-
-      {/* Erreur */}
-      {msg.error && (
-        <div style={{ padding: "4px 12px", background: "rgba(248,81,73,0.1)", color: "var(--red)", fontSize: 11 }}>
-          {msg.error}
-        </div>
-      )}
+        {running && !done && <span>Exécution en cours… <span style={{ opacity: 0.7 }}>— détails dans ▣ Terminal</span></span>}
+        {ok && <span style={{ color: "var(--green)" }}>✓ Commande terminée</span>}
+        {failed && <span style={{ color: "var(--red)" }}>✗ Échec — voir ▣ Terminal pour le détail</span>}
+      </div>
 
       {/* Input interactif */}
       {(msg.waitingInput || (running && !done)) && (

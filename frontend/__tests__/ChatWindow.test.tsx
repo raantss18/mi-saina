@@ -140,7 +140,7 @@ describe("ChatWindow — shell stream blocks", () => {
     expect(screen.getByText("en cours...")).toBeInTheDocument();
   });
 
-  it("renders shell output content", () => {
+  it("does NOT render raw terminal output in chat (details live in the Terminal panel)", () => {
     const messages: Message[] = [
       {
         role: "shell",
@@ -151,10 +151,13 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} />);
-    expect(screen.getByText(/line1/)).toBeInTheDocument();
+    // La sortie brute ne doit plus apparaître dans le chat…
+    expect(screen.queryByText(/line1/)).toBeNull();
+    // …seulement un résumé d'état lisible.
+    expect(screen.getByText(/Commande terminée/)).toBeInTheDocument();
   });
 
-  it("shows error message when error is set", () => {
+  it("shows a compact failure summary instead of the raw error", () => {
     const messages: Message[] = [
       {
         role: "shell",
@@ -166,7 +169,10 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} />);
-    expect(screen.getByText("Command not found")).toBeInTheDocument();
+    // L'erreur brute n'est plus affichée dans le chat…
+    expect(screen.queryByText("Command not found")).toBeNull();
+    // …mais un résumé pointant le panneau Terminal l'est.
+    expect(screen.getByText(/Échec/)).toBeInTheDocument();
   });
 
   it("shows interactive input controls when waitingInput is true", () => {

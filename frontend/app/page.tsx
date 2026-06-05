@@ -65,7 +65,7 @@ export default function Home() {
   const [lastUserMsg, setLastUserMsg] = useState("");
   const [memoryRefresh, setMemoryRefresh] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Charger les skills au démarrage
@@ -399,7 +399,7 @@ export default function Home() {
   };
 
   // Skill autocomplete
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInput(val);
     if (val.startsWith("/")) {
@@ -409,6 +409,14 @@ export default function Home() {
       setSkillMenu(false);
     }
   };
+
+  // Auto-grandissement du champ de saisie (multi-ligne, borné), suit `input`
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [input]);
 
   const applySkill = (skill: Skill) => {
     setInput(skill.prompt);
@@ -639,21 +647,24 @@ export default function Home() {
             <input ref={fileRef} type="file" multiple accept="*/*" style={{ display: "none" }} onChange={handleFileAttach} />
 
             {/* Input */}
-            <div style={{ flex: 1, display: "flex", alignItems: "center", background: "var(--bg)", borderRadius: 6, border: "1px solid var(--border)", padding: "0 10px" }}>
-              <span style={{ color: "var(--accent)", fontSize: 14, fontWeight: 700, marginRight: 6 }}>›</span>
-              <input
+            <div style={{ flex: 1, display: "flex", alignItems: "flex-end", background: "var(--bg)", borderRadius: 6, border: "1px solid var(--border)", padding: "0 10px" }}>
+              <span style={{ color: "var(--accent)", fontSize: 14, fontWeight: 700, marginRight: 6, paddingBottom: 8 }}>›</span>
+              <textarea
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={e => {
+                  // Entrée = envoyer · Maj+Entrée = nouvelle ligne
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
                   if (e.key === "Escape") { setSkillMenu(false); }
                 }}
-                placeholder="Message... ou /skill pour les raccourcis"
+                rows={1}
+                placeholder="Message... (Maj+Entrée = nouvelle ligne) ou /skill pour les raccourcis"
                 disabled={!connected}
                 style={{
                   flex: 1, background: "transparent", border: "none", outline: "none",
                   color: "var(--text)", fontSize: 13, fontFamily: "inherit", padding: "8px 0",
+                  resize: "none", lineHeight: 1.5, maxHeight: 160, overflowY: "auto",
                 }}
               />
             </div>
