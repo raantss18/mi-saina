@@ -1,265 +1,340 @@
 # mi-saina — Assistant IA local
 
-**mi-saina** est un assistant IA local inspiré de Claude Code, fonctionnant entièrement en local avec [Ollama](https://ollama.com). Il dispose d'un accès complet à votre machine Linux : exécution de commandes shell en temps réel, gestion de fichiers, recherche web, et mémoire sémantique des conversations.
+**mi-saina** est un assistant IA local inspiré de Claude Code, qui tourne **100 % sur ta machine** grâce à [Ollama](https://ollama.com). Aucune donnée n'est envoyée dans le cloud. Il a un accès complet à ton ordinateur Linux : exécution de commandes shell en temps réel, gestion de fichiers, recherche web, mémoire des conversations, et outils externes (MCP).
 
-## Fonctionnalités
+> 🐧 **Fonctionne sur toutes les grandes distributions Linux** — Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine. mi-saina **détecte ta distribution** et utilise automatiquement le bon gestionnaire de paquets (`pacman`/`paru`, `apt`, `dnf`, `zypper`, `xbps`, `apk`). Pas besoin d'être sur Arch.
 
-- **LLM local via Ollama** — compatible avec tous les modèles (qwen3.5, magistral, deepseek-r1, gemma, phi4, etc.)
-- **Shell interactif en temps réel** — PTY (pseudo-terminal) avec streaming de la sortie, prompts Y/n interactifs
-- **Mémoire sémantique** — historique des sessions avec recherche cosinus
-- **Gestion de modèles** — téléchargement, mise à jour, suppression depuis l'interface
-- **Skills (slash-commands)** — `/sysinfo`, `/git`, `/top`, `/net` et créez les vôtres
-- **Pièces jointes** — fichiers texte et images (pour modèles vision)
-- **System prompt configurable** — instructions de base pour tous les modèles
-- **Nommage automatique des sessions** — titre généré par le LLM
-- **Import modèles LM Studio** — réutilise les GGUF déjà téléchargés
+---
 
-## Configuration matérielle recommandée
+## ✨ Fonctionnalités
+
+- **LLM 100 % local via Ollama** — compatible avec tous les modèles (Qwen, DeepSeek-R1, Gemma, Phi, Mistral…).
+- **Shell interactif en temps réel** — vraies commandes, sortie en direct, prompts `[Y/n]` interactifs, mot de passe sudo géré en sécurité.
+- **Agent multi-étapes** — le modèle enchaîne commande → résultat → commande suivante pour accomplir une tâche.
+- **Adaptation automatique à ta distro et ton matériel** — les commandes de mise à jour/installation sont toujours correctes pour TON système.
+- **Mémoire** — recherche sémantique + plein-texte de l'historique, profil utilisateur persistant, fichiers de contexte de projet.
+- **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
+- **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
+
+---
+
+## 🖥️ Prérequis matériels
 
 | Composant | Minimum | Recommandé |
 |-----------|---------|------------|
-| RAM | 16 GB | 32 GB |
-| GPU VRAM | 6 GB | 8 GB+ |
-| Stockage | 20 GB libres | 100 GB+ |
-| OS | Linux (Arch, Ubuntu, Fedora) | EndeavourOS / Arch |
+| RAM | 8 GB | 16–32 GB |
+| GPU | *(optionnel)* | NVIDIA/AMD 8 GB+ VRAM |
+| Stockage | 15 GB libres | 50 GB+ |
+| OS | n'importe quelle distribution Linux récente | — |
 
-## Installation rapide
+> 💡 **Pas de GPU ?** Ça marche quand même : mi-saina détecte ta RAM et propose un modèle plus léger. C'est juste plus lent. Plus ton matériel est costaud, plus tu peux utiliser un gros modèle.
+
+---
+
+## 🚀 Installation rapide (recommandée)
+
+Une seule commande, quelle que soit ta distribution :
 
 ```bash
-# 1. Cloner le dépôt
 git clone https://github.com/raantss18/mi-saina.git
 cd mi-saina
-
-# 2. Lancer l'installation automatique
 bash install.sh
 ```
 
-L'installeur :
-1. **Détecte ta distribution** (Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine) et installe Python 3, Node.js, Git avec le bon gestionnaire de paquets
-2. Installe et configure Ollama
-3. **Détecte ton matériel (RAM/VRAM)** et te propose le modèle idéal — Qwen, DeepSeek ou Gemma (taille adaptée à ta machine)
-4. Crée le venv Python et installe les dépendances
-5. Installe les dépendances Node.js
-6. Configure les services systemd (démarrage automatique au boot)
+Le script `install.sh` fait tout, dans l'ordre :
 
-> mi-saina s'adapte ensuite **automatiquement à ta distribution** : le matériel et les commandes du gestionnaire de paquets (mise à jour, installation…) sont détectés à l'exécution et fournis au modèle.
+1. **Détecte ta distribution** et installe les dépendances système (Python 3, Node.js, Git, curl) avec ton gestionnaire de paquets.
+2. **Installe et démarre Ollama**.
+3. **Analyse ton matériel** (RAM/VRAM) et te propose un modèle adapté (Qwen / DeepSeek / Gemma, ou ton propre tag), puis le télécharge.
+4. **Crée l'environnement Python** (`~/mi-saina-env`) et installe les dépendances du backend.
+5. **Installe le frontend** (`npm install`).
+6. **Configure les services systemd** pour un démarrage automatique au boot.
+7. **Choisit automatiquement des ports libres** si 8000 (backend) ou 3001 (frontend) sont déjà occupés.
 
-## Installation manuelle (étape par étape)
+À la fin, ouvre l'URL affichée (par défaut **http://localhost:3001**).
 
-### Prérequis
+> Tu peux forcer les ports : `BACKEND_PORT=8010 FRONTEND_PORT=3010 bash install.sh`.
+
+---
+
+## 🔧 Installation manuelle (étape par étape)
+
+Si tu préfères tout faire à la main.
+
+### 1. Dépendances système
+
+<details>
+<summary><b>Arch / EndeavourOS / Manjaro</b></summary>
 
 ```bash
-# Arch / EndeavourOS
-sudo pacman -S --needed python nodejs npm git curl
-
-# Ubuntu / Debian
-sudo apt install python3 python3-pip python3-venv nodejs npm git curl
+sudo pacman -S --needed python python-pip nodejs npm git curl base-devel
 ```
+</details>
 
-### Ollama
+<details>
+<summary><b>Debian / Ubuntu / Mint / Pop!_OS</b></summary>
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv nodejs npm git curl build-essential
+```
+</details>
+
+<details>
+<summary><b>Fedora / RHEL / CentOS</b></summary>
+
+```bash
+sudo dnf install -y python3 python3-pip nodejs npm git curl @development-tools
+```
+</details>
+
+<details>
+<summary><b>openSUSE</b></summary>
+
+```bash
+sudo zypper install -y python3 python3-pip nodejs npm git curl gcc gcc-c++ make
+```
+</details>
+
+<details>
+<summary><b>Void Linux</b></summary>
+
+```bash
+sudo xbps-install -Sy python3 python3-pip nodejs git curl base-devel
+```
+</details>
+
+<details>
+<summary><b>Alpine</b></summary>
+
+```bash
+sudo apk add python3 py3-pip nodejs npm git curl build-base
+```
+</details>
+
+### 2. Ollama (le moteur des modèles)
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3.5:9b   # Modèle par défaut (~6.6GB)
+ollama pull qwen3.5:9b   # modèle d'exemple (~6.5 GB) ; choisis selon ta machine
 ```
 
-### Backend Python
+> Petite config ? Essaie `qwen2.5:3b` ou `gemma3:4b`. Grosse config ? `qwen3:14b`, `gemma3:12b`…
+
+### 3. Backend (Python)
 
 ```bash
+cd mi-saina
 python3 -m venv ~/mi-saina-env
 source ~/mi-saina-env/bin/activate
-pip install fastapi uvicorn httpx "pydantic>=2" pydantic-settings python-dotenv \
-    aiofiles websockets rich sqlalchemy aiosqlite numpy ollama duckduckgo-search
+pip install -r backend/requirements.txt
 ```
 
-### Frontend Next.js
+### 4. Frontend (Next.js)
 
 ```bash
-cd ~/mi-saina/frontend
+cd frontend
 npm install
+cd ..
 ```
 
-### Configuration
+### 5. Configuration
 
 ```bash
 cp .env.example .env
-# Éditez .env pour choisir vos modèles
+# Édite .env pour choisir ton modèle (REASONING_MODEL / FAST_MODEL)
 ```
 
-### Services systemd (démarrage auto)
+### 6. Démarrage
 
 ```bash
-# Créer les services
-mkdir -p ~/.config/systemd/user
-
-# Voir install.sh pour les fichiers de service complets
-systemctl --user enable --now mi-saina-backend mi-saina-frontend
-loginctl enable-linger $USER
+bash start.sh
 ```
 
-### Démarrage manuel
+`start.sh` lance Ollama (si besoin), le backend et le frontend, et **bascule automatiquement sur un port libre** si 8000/3001 sont pris. Ouvre ensuite l'URL affichée.
 
-```bash
-bash ~/mi-saina/start.sh
-```
+> Pour un démarrage automatique au boot, utilise plutôt `bash install.sh` qui crée les services systemd.
 
-## Importer les modèles LM Studio
+---
 
-Si vous avez déjà téléchargé des modèles via LM Studio (`~/.lmstudio/models/`), vous pouvez les importer dans Ollama sans re-télécharger :
-
-```bash
-bash ~/mi-saina/import_lmstudio.sh
-```
-
-Le script détecte automatiquement ce qui est déjà importé et saute les doublons.
-
-## Utilisation
+## 🎮 Utilisation
 
 ### Interface web
 
-Ouvrez http://localhost:3001 dans votre navigateur.
+Ouvre **http://localhost:3001** (ou le port affiché au démarrage).
 
-### Contrôles
+### Boutons principaux
 
 | Bouton | Action |
 |--------|--------|
-| `↵` | Envoyer le message |
-| `⏹` (rouge) | Arrêter la génération |
+| `↵` | Envoyer le message (**Maj+Entrée** = nouvelle ligne) |
+| `⏹` | Arrêter la génération / la commande en cours |
 | `↺` | Relancer le dernier prompt |
 | `⎘` | Copier la dernière réponse |
 | `🗑` | Effacer la conversation |
-| `📎` | Joindre un fichier / image |
+| `📎` | Joindre un fichier ou une image |
+| `▣ Terminal` | Afficher le panneau terminal (sortie détaillée des commandes) |
 
-### Skills (slash-commands)
+### Parler naturellement
 
-Tapez `/` dans le champ pour voir les skills disponibles :
+Demande simplement ce que tu veux, en langage courant :
 
-| Trigger | Description |
-|---------|-------------|
+- *« Crée un dossier `projet` dans mon home »*
+- *« Mets à jour mon système »* → lance la bonne commande pour TA distro
+- *« Montre-moi l'utilisation du disque »*
+- *« Clone ce dépôt git et installe ses dépendances »*
+- *« Crée un script Python qui affiche la date, puis exécute-le »*
+
+mi-saina exécute les commandes lui-même (en demandant ton accord pour les actions sensibles). La sortie complète apparaît dans le panneau **▣ Terminal** ; le chat reste lisible.
+
+### Skills (raccourcis `/`)
+
+Tape `/` dans le champ pour voir les raccourcis (navigation au clavier ↑/↓, **Tab/Entrée** pour valider) :
+
+| Raccourci | Description |
+|-----------|-------------|
 | `/sysinfo` | Infos système (CPU, RAM, GPU, disque) |
-| `/git` | Statut git du répertoire courant |
+| `/git` | Statut git du dossier courant |
 | `/top` | Processus les plus gourmands |
 | `/net` | État réseau |
 | `/pkg` | Mises à jour disponibles (sans installer) |
-| `/update` | Mise à jour complète du système (`paru -Syu`) |
+| `/update` | Met à jour le système (commande adaptée à ta distro) |
 | `/explain` | Explique la dernière commande |
 
-Créez vos propres skills dans **⚙ Config → Skills**.
+Crée tes propres skills dans **⚙ Config → Skills**.
 
-### Exécution de commandes
+### Commandes nécessitant les droits root
 
-L'assistant peut exécuter des commandes directement sur votre machine. Il utilise la syntaxe `[EXEC: commande]` dans ses réponses. Les commandes sont exécutées dans un PTY (pseudo-terminal) avec streaming en temps réel.
+Quand une action demande `sudo` (installer un paquet, activer un service…), une fenêtre **mot de passe sudo** s'ouvre. Le mot de passe **n'est jamais stocké** : il est transmis à la volée uniquement au moment où le système le demande.
 
-**Exemples :**
-- *"Crée un dossier projet dans mon home"*
-- *"Met à jour mon système"* (lance `paru -Syu`)
-- *"Montre-moi l'utilisation disque"*
-- *"Clone ce dépôt git et installe ses dépendances"*
+- mi-saina utilise **le gestionnaire de paquets de ta distribution** (détecté automatiquement) — jamais celui d'une autre.
+- Les confirmations `[Y/n]` restent **interactives** (tu réponds dans l'interface).
+- Le bouton **« Tout valider »** permet d'approuver d'un coup toutes les commandes d'une tâche.
 
-### Commandes root (sudo / pacman / paru)
+---
 
-mi-saina cible **EndeavourOS / Arch** : il utilise `pacman` et `paru` (jamais `apt`/`dnf`).
+## 🧩 Outils externes (MCP) — optionnel
 
-Quand une commande nécessite les droits root (`paru`, `sudo pacman -S`, `systemctl enable`…), l'interface ouvre une fenêtre **mot de passe sudo**. Le mot de passe n'est jamais stocké : il est injecté à la volée uniquement au moment où sudo l'affiche (`[sudo] password for …`), ce qui fonctionne aussi pour `paru` (qui escalade lui-même via sudo).
+mi-saina peut utiliser des **serveurs d'outils MCP** (filesystem, fetch web, git, sqlite…) en plus du shell.
 
-Les confirmations `[Y/n]` restent **interactives** : elles s'affichent dans le bloc terminal et vous répondez via le champ de saisie. mi-saina n'ajoute jamais `--noconfirm`, et ne lance jamais `paru`/`yay` avec `sudo` (ces outils refusent de tourner en root).
+1. Copie l'exemple et adapte-le :
+   ```bash
+   cp config/mcp.json.example ~/.config/mi-saina/mcp.json
+   # édite le fichier : chemins, serveurs voulus
+   ```
+2. Active **« Outils externes MCP »** dans **⚙ Config → Réglages**.
 
-## Structure du projet
+Les outils déclarés deviennent appelables par l'assistant. Désactivé par défaut pour garder l'installation simple. Liste de serveurs officiels : <https://github.com/modelcontextprotocol/servers>.
 
-```
-mi-saina/
-├── backend/                 # API FastAPI
-│   ├── main.py
-│   ├── config.py
-│   ├── routers/
-│   │   ├── chat.py          # WebSocket + shell streaming
-│   │   ├── models.py        # Gestion modèles Ollama
-│   │   ├── shell.py         # Exécution shell
-│   │   ├── search.py        # Recherche DuckDuckGo
-│   │   ├── memory.py        # Sessions et mémoire
-│   │   └── config_router.py # System prompt + skills
-│   └── services/
-│       ├── llm.py           # Interface Ollama
-│       ├── shell_stream.py  # PTY streaming
-│       ├── shell_exec.py    # Exécution simple
-│       ├── web_search.py    # DuckDuckGo
-│       └── memory.py        # SQLite + embeddings
-├── frontend/                # Next.js
-│   ├── app/
-│   │   ├── page.tsx         # Interface principale
-│   │   └── layout.tsx
-│   └── components/
-│       ├── ChatWindow.tsx
-│       ├── MemoryPanel.tsx
-│       ├── ModelPanel.tsx
-│       ├── ConfigPanel.tsx
-│       └── SearchResults.tsx
-├── config/
-│   ├── system_prompt.txt    # Instructions globales pour le LLM
-│   └── skills/              # Skills prédéfinis
-├── .env.example
-├── install.sh
-├── start.sh
-└── import_lmstudio.sh
-```
+---
 
-## Configuration avancée
+## ⚙️ Configuration avancée
 
-### Changer le modèle
+### Réglages dans l'interface
 
-Via l'interface : bouton **⬡ Modèles** dans le header.
+**⚙ Config → Réglages** expose, applicables à chaud (sans redémarrage) :
 
-Via le fichier `.env` :
-```bash
-REASONING_MODEL=magistral:small
-FAST_MODEL=magistral:small
-```
+- **Confirmation avant exécution** (`risky` / `all` / `never`)
+- **Étapes agentiques max**
+- **Timeout d'inactivité shell** (monte-le pour les grosses mises à jour / téléchargements)
+- **Fenêtre de contexte** (`num_ctx`) + **adaptation automatique à la VRAM libre**
+- **Découpage des tâches lourdes**, **résumé d'historique**, **outils MCP**
 
-### Modifier le system prompt
+### Changer de modèle
 
-Via l'interface : **⚙ Config → System Prompt**.
+- Via l'interface : bouton **⬡ Modèles**.
+- Via `.env` :
+  ```bash
+  REASONING_MODEL=qwen3.5:9b
+  FAST_MODEL=qwen3.5:9b
+  ```
 
-Ou directement dans `config/system_prompt.txt`.
+### Ports personnalisés
 
-### Ajouter un modèle personnalisé
+Les scripts choisissent un port libre automatiquement. Pour forcer :
 
 ```bash
-# Depuis Ollama Hub
-ollama pull nom-du-modele
-
-# Depuis un fichier GGUF local
-echo "FROM /chemin/vers/model.gguf" | ollama create mon-modele -f /dev/stdin
+BACKEND_PORT=8010 FRONTEND_PORT=3010 bash start.sh
 ```
 
-## Dépannage
+Le frontend lit l'URL du backend via `NEXT_PUBLIC_API_BASE` (par défaut `http://localhost:8000`).
 
-### Le backend ne démarre pas
+### System prompt
 
+**⚙ Config → System Prompt**, ou directement `config/system_prompt.txt`.
+
+### Importer des modèles LM Studio
+
+Déjà des modèles GGUF via LM Studio ? Réutilise-les sans re-télécharger :
+
+```bash
+bash import_lmstudio.sh
+```
+
+---
+
+## 🛠️ Dépannage
+
+**Le backend ne démarre pas**
 ```bash
 systemctl --user status mi-saina-backend
 journalctl --user -u mi-saina-backend -n 50
 ```
 
-### Ollama ne répond pas
-
+**« model not found » / l'assistant ne répond pas** — le modèle de `.env` n'est pas téléchargé :
 ```bash
-curl http://localhost:11434/api/tags   # Vérifier l'API
-pgrep -a ollama                         # Vérifier le processus
-systemctl --user restart ollama         # Redémarrer
+ollama list                 # voir les modèles installés
+ollama pull qwen3.5:9b      # en télécharger un, puis le sélectionner dans ⬡ Modèles
 ```
 
-### Les commandes shell ne s'exécutent pas
+**Ollama ne répond pas**
+```bash
+curl http://localhost:11434/api/tags   # vérifier l'API
+systemctl --user restart ollama        # ou : ollama serve
+```
 
-Vérifiez que le backend tourne et que votre modèle comprend la syntaxe `[EXEC: ...]`. Le system prompt inclut les instructions nécessaires.
+**Le port 8000 ou 3001 est déjà pris** — les scripts basculent tout seuls sur un port libre (regarde l'URL affichée au démarrage). Tu peux aussi forcer `BACKEND_PORT`/`FRONTEND_PORT`.
 
-### Mise à jour de l'application
-
+**Mettre à jour mi-saina**
 ```bash
 cd mi-saina
 git pull
-bash install.sh   # Ré-exécuter pour mettre à jour les dépendances
+bash install.sh   # ré-installe les dépendances et redémarre les services
 ```
 
-## Licence
+---
 
-MIT — Libre d'utilisation, modification et distribution.
+## 📁 Structure du projet
+
+```
+mi-saina/
+├── backend/                 # API FastAPI (Python)
+│   ├── main.py
+│   ├── config.py            # réglages + valeurs modifiables à chaud
+│   ├── routers/             # chat (WebSocket), models, shell, search, memory, config
+│   └── services/
+│       ├── llm.py           # interface Ollama (+ num_ctx adaptatif)
+│       ├── shell_stream.py  # exécution PTY temps réel (sudo, GUI, réparation de chemin)
+│       ├── planner.py       # découpage des tâches + gestion du contexte
+│       ├── diagnostics.py   # détection d'erreurs dans la sortie
+│       ├── sysinfo.py       # détection distro/matériel/VRAM
+│       ├── mcp_client.py    # client MCP (outils externes)
+│       └── memory.py        # SQLite + embeddings + recherche
+├── frontend/                # interface Next.js
+│   ├── app/page.tsx         # interface principale
+│   ├── components/          # Chat, Terminal, Modèles, Config, Mémoire, Planning…
+│   └── lib/config.ts        # URL backend centralisée (API_BASE / WS_BASE)
+├── config/
+│   ├── system_prompt.txt    # instructions globales du modèle
+│   ├── skills/              # skills prédéfinis
+│   └── mcp.json.example     # exemple de config MCP
+├── install.sh               # installation automatique multi-distro
+├── start.sh                 # démarrage manuel (sans systemd)
+└── import_lmstudio.sh       # import de modèles LM Studio
+```
+
+---
+
+## 📄 Licence
+
+MIT — libre d'utilisation, de modification et de distribution.
