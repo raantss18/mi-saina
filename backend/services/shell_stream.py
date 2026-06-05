@@ -25,6 +25,7 @@ import signal
 import struct
 import termios
 
+from config import settings
 from services import apps
 
 ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -299,7 +300,7 @@ def sanitize(cmd: str) -> str:
 async def stream_pty(
     cmd: str,
     sudo_password: str | None = None,
-    timeout: int = 600,
+    idle_timeout: int | None = None,
     cols: int = 120,
     rows: int = 40,
     stdin_queue: asyncio.Queue | None = None,
@@ -313,6 +314,9 @@ async def stream_pty(
       {"type": "error",     "message": str}
       {"type": "needs_sudo","command": str}
     """
+    if idle_timeout is None:
+        idle_timeout = settings.SHELL_IDLE_TIMEOUT
+
     if _is_dangerous(cmd):
         yield {"type": "error", "message": "⛔ Commande bloquée : pattern dangereux."}
         return
@@ -373,7 +377,6 @@ async def stream_pty(
     flags = fcntl.fcntl(master, fcntl.F_GETFL)
     fcntl.fcntl(master, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
-    elapsed = 0.0
     last_output_at = asyncio.get_event_loop().time()
     idle_warned = False
     pw_buffer = ""            # fenêtre glissante pour détecter le prompt sudo
@@ -399,7 +402,6 @@ async def stream_pty(
     try:
         while True:
             await asyncio.sleep(0.04)
-            elapsed += 0.04
 
             # ── Arrêt demandé par l'utilisateur ────────────────────────
             if stop_event is not None and stop_event.is_set():
@@ -425,12 +427,20 @@ async def stream_pty(
                             pass
                 break
 
-            if elapsed > timeout:
+            # ── Timeout d'INACTIVITÉ : couper seulement si AUCUNE sortie depuis
+            #    idle_timeout (process bloqué/abandonné). Un téléchargement qui
+            #    progresse sort en continu → last_output_at est rafraîchi → jamais
+            #    coupé tant qu'il avance. ⏹ reste dispo pour arrêter à la main. ──
+            if (asyncio.get_event_loop().time() - last_output_at) > idle_timeout:
                 try:
-                    proc.kill()
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                 except Exception:
-                    pass
-                yield {"type": "chunk", "text": f"\n[⏱ Timeout après {timeout}s]\n"}
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                yield {"type": "chunk",
+                       "text": f"\n[⏱ Aucune activité depuis {idle_timeout}s — commande arrêtée]\n"}
                 break
 
             # ── Lire la sortie du PTY ──────────────────────────────────

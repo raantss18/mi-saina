@@ -2,6 +2,9 @@
 
 ## [Non publié]
 
+### Corrigé
+- **Timeout shell tuant les longues commandes (maj système, gros téléchargements)** : `stream_pty` coupait toute commande après **600 s de temps total**, ce qui interrompait un `paru -Syu` de plusieurs Go en plein milieu. Le timeout est désormais basé sur l'**inactivité** : on ne coupe que si la commande ne produit **aucune sortie** pendant `SHELL_IDLE_TIMEOUT` (défaut 600 s, réglable dans l'UI Config). Un téléchargement qui progresse sort en continu → jamais coupé tant qu'il avance (⏹ reste disponible pour arrêter à la main). De plus, l'arrêt sur timeout tue désormais tout le **groupe de processus** (`killpg`/SIGKILL) au lieu du seul shell, pour ne pas laisser `pacman` orphelin. NB : pacman met les paquets complets en cache (`/var/cache/pacman/pkg`), donc une reprise ne re-télécharge que le paquet interrompu.
+
 ### Ajouté
 - **Résolution de référents entre sous-tâches** : chaque sous-tâche s'exécutant dans un contexte neuf, un pronom qui renvoie à l'étape précédente (« compile-**le** », « ouvre-**la** », « lance ça ») n'avait aucun référent. Désormais (1) le scratch partagé conserve les **commandes concrètes** réussies de chaque étape (pas seulement un résumé textuel), et (2) quand une sous-tâche contient un référent pendant, un indice `[RÉFÉRENCE]` pointant le **dernier artefact** (chemin de fichier produit) est injecté avant la sous-tâche. Détection volontairement stricte (les articles « le/la/les + nom » ne déclenchent rien). Helpers déterministes `has_dangling_reference` / `last_artifact` / `reference_hint` dans `services.planner`, couverts par `tests/test_planner_refs.py`.
 

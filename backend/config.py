@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     PORT: int = 8000
     MAX_SEARCH_RESULTS: int = 5
     SHELL_TIMEOUT: int = 30
+    # Timeout d'INACTIVITÉ du PTY (s) : on coupe une commande seulement si elle
+    # ne produit AUCUNE sortie pendant ce délai (process bloqué / abandonné).
+    # Un téléchargement long (paru -Syu de plusieurs Go) sort en continu → jamais
+    # coupé tant qu'il progresse. ⏹ reste disponible pour arrêter manuellement.
+    SHELL_IDLE_TIMEOUT: int = 600
     # Quand demander la confirmation Exécuter/Refuser avant une commande :
     #   "risky"  → seulement les commandes destructrices (rm, dd, kill, git reset --hard…)
     #   "all"    → avant chaque commande
@@ -63,6 +68,12 @@ EDITABLE_SETTINGS: dict = {
         "type": "int", "min": 1, "max": 20,
         "label": "Étapes agentiques max",
         "help": "Nombre max d'allers-retours modèle ↔ commandes par requête.",
+    },
+    "SHELL_IDLE_TIMEOUT": {
+        "type": "int", "min": 30, "max": 7200, "step": 30,
+        "label": "Timeout d'inactivité shell (s)",
+        "help": "On coupe une commande seulement après ce délai SANS aucune sortie. "
+                "Mettre haut (ex. 1800) pour les longues maj/téléchargements ; ⏹ arrête à la main.",
     },
     "NUM_CTX": {
         "type": "int", "min": 1024, "max": 32768, "step": 512,
