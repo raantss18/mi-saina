@@ -225,13 +225,32 @@ async def _llm_plan(user_input: str) -> list[str]:
         return []
 
 
+def _merge_micro_steps(parts: list[str]) -> list[str]:
+    """Recolle les FRAGMENTS à l'étape précédente pour éviter le sur-découpage
+    (chaque sous-tâche = un contexte LLM neuf, coûteux). Conservateur : on ne
+    recolle qu'un mot isolé (ex. « sauvegarde ») ou un pur référent pendant
+    (« compile-le »). Les vraies actions verbe+objet (« installe vim ») restent
+    des étapes distinctes."""
+    if len(parts) <= 1:
+        return parts
+    out = [parts[0]]
+    for p in parts[1:]:
+        is_single_word = len(p.split()) <= 1
+        is_dangling = has_dangling_reference(p) and len(p) < 30
+        if is_single_word or is_dangling:
+            out[-1] = f"{out[-1]} et {p}"
+        else:
+            out.append(p)
+    return out
+
+
 async def plan_task(user_input: str) -> list[str]:
     """Renvoie la liste ordonnée des sous-tâches (1 seule = pas de découpage)."""
     if settings.PLANNER_USE_LLM:
         tasks = await _llm_plan(user_input)
         if len(tasks) > 1:
-            return tasks
-    return rule_split(user_input)
+            return _merge_micro_steps(tasks)
+    return _merge_micro_steps(rule_split(user_input))
 
 
 # ── Résolution de référents entre sous-tâches (« compile-le », « ouvre-la ») ──

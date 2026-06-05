@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     NUM_CTX: int = 8192
     # Adapter num_ctx à la VRAM LIBRE détectée (borné par NUM_CTX). False = fixe.
     NUM_CTX_AUTO: bool = True
+    # Outils externes via MCP (serveurs configurés dans ~/.config/mi-saina/mcp.json).
+    # Désactivé par défaut pour garder l'install simple.
+    MCP_ENABLED: bool = False
     # Budget de tokens des messages envoyés au modèle (garde-fou anti-saturation).
     MAX_CONTEXT_TOKENS: int = 5500
     # Résumer (extractif, sans LLM) l'historique élagué au lieu de le couper net,
@@ -89,6 +92,12 @@ EDITABLE_SETTINGS: dict = {
         "label": "Adapter num_ctx à la VRAM libre",
         "help": "Réduit automatiquement la fenêtre de contexte quand la VRAM libre est faible "
                 "(borné par num_ctx ci-dessus). VRAM inconnue → valeur fixe.",
+    },
+    "MCP_ENABLED": {
+        "type": "bool",
+        "label": "Outils externes MCP",
+        "help": "Active les serveurs d'outils MCP configurés dans ~/.config/mi-saina/mcp.json "
+                "(filesystem, git, fetch…). Désactivé = aucun outil externe.",
     },
     "MAX_CONTEXT_TOKENS": {
         "type": "int", "min": 1000, "max": 30000, "step": 250,

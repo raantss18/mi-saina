@@ -15,7 +15,7 @@ from services.memory import (
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
-from services import diagnostics, userctx
+from services import diagnostics, userctx, mcp_client
 from services.sysinfo import system_block
 
 router = APIRouter()
@@ -35,6 +35,10 @@ def _load_system_prompt() -> str:
     ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
     if ctx:
         parts.append(ctx)
+    if settings.MCP_ENABLED:           # outils externes MCP (si configurés)
+        mcp_block = mcp_client.tools_block()
+        if mcp_block:
+            parts.append(mcp_block)
     return "\n\n".join(parts)
 
 
@@ -479,8 +483,9 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 await websocket.send_text(json.dumps({"type": "memory_saved", "fact": fact}))
 
         cmds = [c.strip() for c in EXEC_RE.findall(full_response) if c.strip()]
-        if not cmds:
-            # Pas de commande : si l'utilisateur a redirigé pendant la réponse, on continue
+        mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
+        if not cmds and not mcp_calls:
+            # Pas d'action : si l'utilisateur a redirigé pendant la réponse, on continue
             redirects = _drain_redirects(queue)
             if redirects:
                 await _inject_redirects(redirects, messages, websocket, session_id, persist)
@@ -510,6 +515,20 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 stopped = True
                 await websocket.send_text(json.dumps({"type": "stopped"}))
                 break
+
+        # ── Appels d'outils MCP (après les commandes shell) ────────────────
+        if not stopped:
+            for srv, tool, args in mcp_calls:
+                label = f"MCP {srv}.{tool}"
+                await websocket.send_text(json.dumps({"type": "shell_start", "command": label}))
+                out, rc = await mcp_client.call(srv, tool, args)
+                await websocket.send_text(json.dumps({
+                    "type": "shell_done", "command": label, "returncode": rc,
+                    "status": "success" if rc == 0 else "failure",
+                    "logical_failure": False, "status_reason": None,
+                }))
+                results.append((label, out, rc))
+                executed.append((label, rc))
 
         if stopped or step == settings.MAX_AGENT_STEPS - 1 or declined:
             break
@@ -571,6 +590,11 @@ async def chat_ws(websocket: WebSocket):
                 asyncio.create_task(
                     _auto_name_session(session_id, user_input, "", websocket)
                 )
+
+            # Outils MCP : démarrer les serveurs configurés (une fois) avant de
+            # construire le system prompt qui liste leurs outils.
+            if settings.MCP_ENABLED:
+                await mcp_client.ensure_started()
 
             # ── Tâche lourde → planifier puis exécuter en sous-agents (contexte frais) ──
             stopped = False

@@ -7,7 +7,9 @@ commandes précédentes. Helpers déterministes → testables sans LLM.
 """
 import pytest
 
-from services.planner import has_dangling_reference, last_artifact, reference_hint
+from services.planner import (
+    has_dangling_reference, last_artifact, reference_hint, _merge_micro_steps,
+)
 
 
 class TestHasDanglingReference:
@@ -68,3 +70,23 @@ class TestReferenceHint:
 
     def test_no_hint_when_both_missing(self):
         assert reference_hint("affiche la date", ["date"]) == ""
+
+
+class TestMergeMicroSteps:
+    def test_short_fragment_merged_into_previous(self):
+        out = _merge_micro_steps(["crée un fichier source main.c", "sauvegarde"])
+        assert out == ["crée un fichier source main.c et sauvegarde"]
+
+    def test_dangling_reference_merged(self):
+        out = _merge_micro_steps(["crée le script build.sh", "lance-le"])
+        assert out == ["crée le script build.sh et lance-le"]
+
+    def test_real_steps_kept_separate(self):
+        steps = ["clone le dépôt github project", "installe les dépendances npm du projet"]
+        assert _merge_micro_steps(steps) == steps
+
+    def test_single_step_unchanged(self):
+        assert _merge_micro_steps(["une seule étape ici"]) == ["une seule étape ici"]
+
+    def test_empty(self):
+        assert _merge_micro_steps([]) == []

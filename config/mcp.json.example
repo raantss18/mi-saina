@@ -1,0 +1,15 @@
+{
+  "_comment": "Copiez ce fichier vers ~/.config/mi-saina/mcp.json puis activez « Outils externes MCP » dans ⚙ Config → Réglages. Chaque serveur est lancé en sous-processus (stdio). Exemples officiels : https://github.com/modelcontextprotocol/servers",
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/USER/Documents"],
+      "env": {}
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {}
+    }
+  }
+}
