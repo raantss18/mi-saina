@@ -167,18 +167,34 @@ async def ensure_started() -> None:
     _tools_block = _build_tools_block()
 
 
+def _short_desc(text: str, limit: int = 90) -> str:
+    """Première phrase d'une description, tronquée — pour un prompt compact."""
+    text = " ".join((text or "").split())          # aplati les espaces/retours
+    first = text.split(". ", 1)[0]                   # 1re phrase
+    if len(first) > limit:
+        first = first[:limit].rstrip() + "…"
+    return first
+
+
 def _build_tools_block() -> str:
     if not _servers:
         return ""
-    lines = ["## OUTILS MCP DISPONIBLES",
-             "Tu peux appeler ces outils avec la syntaxe "
-             "[MCP: serveur.outil {\"arg\": \"valeur\"}] (JSON facultatif). "
-             "Le résultat te sera renvoyé pour poursuivre."]
+    # IMPORTANT : ces outils s'AJOUTENT au shell, ils ne le remplacent pas.
+    # On le dit explicitement pour qu'un modèle local ne croie pas avoir « perdu »
+    # l'accès terminal en voyant cette liste.
+    lines = [
+        "## OUTILS MCP (optionnels, EN PLUS du shell)",
+        "Tu conserves ton accès complet au terminal via [EXEC: commande]. "
+        "Les outils ci-dessous sont un BONUS, à utiliser seulement si c'est plus "
+        "pratique que le shell. Syntaxe : [MCP: serveur.outil {\"arg\": \"valeur\"}] "
+        "(JSON facultatif).",
+    ]
     for name, srv in _servers.items():
         for t in srv.tools:
-            desc = (t.get("description") or "").strip().splitlines()
-            short = desc[0] if desc else ""
-            lines.append(f"- {name}.{t['name']} : {short}")
+            desc = t.get("description") or ""
+            if "DEPRECATED" in desc.upper():         # on n'expose pas les outils dépréciés
+                continue
+            lines.append(f"- {name}.{t['name']} : {_short_desc(desc)}")
     return "\n".join(lines)
 
 
