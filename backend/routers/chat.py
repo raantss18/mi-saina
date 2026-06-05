@@ -5,7 +5,6 @@ import json
 
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel
 
 from config import settings
 from services.llm import stream_response, select_model
@@ -13,7 +12,6 @@ from services.memory import (
     add_message, get_session_messages, build_context_prefix, create_session,
     update_session_title, session_message_count,
 )
-from services.shell_exec import execute_command
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget
 from services import diagnostics, userctx
@@ -360,48 +358,6 @@ async def _stream_llm(messages: list, task_type: str, websocket: WebSocket,
         await websocket.send_text(json.dumps({"type": "token", "content": token}))
         full_response += token
     return full_response, stopped
-
-
-class ChatRequest(BaseModel):
-    message: str
-    task_type: str = "reason"
-    session_id: str | None = None
-    attachments: list | None = None
-
-
-@router.post("/complete")
-async def chat_complete(body: ChatRequest):
-    session_id = body.session_id or create_session().id
-    memory_context = await build_context_prefix(body.message)
-    history = get_session_messages(session_id)
-    messages = _build_messages(history, body.message, memory_context, body.attachments)
-    await add_message(session_id, "user", body.message)
-
-    full_response = ""
-    async for token in stream_response(messages, body.task_type):
-        full_response += token
-
-    shell_results = []
-    for cmd in EXEC_RE.findall(full_response):
-        result = await execute_command(cmd.strip())
-        shell_results.append({"command": cmd.strip(), "result": result})
-
-    await add_message(session_id, "assistant", full_response)
-
-    # Nommage auto si c'est le premier échange
-    title = None
-    if session_message_count(session_id) <= 2:
-        title = await _generate_title(body.message, full_response)
-        if title:
-            update_session_title(session_id, title)
-
-    return {
-        "session_id": session_id,
-        "model": select_model(body.task_type),
-        "response": full_response,
-        "shell_results": shell_results,
-        "session_title": title,
-    }
 
 
 def _drain_redirects(queue: asyncio.Queue) -> list[str]:

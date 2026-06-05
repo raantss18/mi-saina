@@ -1,5 +1,10 @@
 # Changelog
 
+## [Non publié]
+
+### Supprimé
+- **Endpoint REST `POST /chat/complete`** (et le modèle `ChatRequest`) : code mort et divergent — le frontend ne passe que par le WebSocket `/chat/ws`. Ce chemin ne disposait ni de la boucle agentique, ni de la gestion GUI, ni de la validation/sudo, et constituait un piège (comportement différent du WS). Retiré ; `services.shell_exec.execute_command` reste utilisé par l'endpoint `/shell`.
+
 ## [1.6.1] - 2026-06-05
 
 ### Corrigé
