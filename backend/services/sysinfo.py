@@ -6,12 +6,15 @@ ajouté dynamiquement pour que mi-saina s'adapte à n'importe quelle machine et
 distribution (gestionnaire de paquets, commandes de maj/install correctes).
 """
 
+import glob
 import os
 import re
 import shutil
 import subprocess
+import time
 
 _cache: str | None = None
+_vram_cache: dict = {"t": 0.0, "mb": None}
 
 
 def _read_os_release() -> dict:
@@ -106,6 +109,69 @@ def _gpu() -> str:
         except Exception:
             pass
     return "inconnu"
+
+
+def _query_free_vram_mb() -> int | None:
+    """VRAM libre (Mo), best-effort, agnostique du GPU/bureau. None si inconnu."""
+    # NVIDIA
+    if shutil.which("nvidia-smi"):
+        try:
+            out = subprocess.run(
+                ["nvidia-smi", "--query-gpu=memory.free",
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=4).stdout
+            vals = [int(x) for x in re.findall(r"\d+", out)]
+            if vals:
+                return min(vals)          # conservateur si plusieurs GPU
+        except Exception:
+            pass
+    # AMD (amdgpu via sysfs)
+    try:
+        best = None
+        for dev in glob.glob("/sys/class/drm/card*/device"):
+            try:
+                with open(f"{dev}/mem_info_vram_total") as f:
+                    total = int(f.read())
+                with open(f"{dev}/mem_info_vram_used") as f:
+                    used = int(f.read())
+            except OSError:
+                continue
+            free = (total - used) // (1024 * 1024)
+            best = free if best is None else min(best, free)
+        if best is not None:
+            return best
+    except Exception:
+        pass
+    return None
+
+
+def free_vram_mb(ttl: float = 15.0) -> int | None:
+    """VRAM libre (Mo) avec petit cache (éviter d'appeler nvidia-smi à chaque token)."""
+    now = time.time()
+    if now - _vram_cache["t"] < ttl:
+        return _vram_cache["mb"]
+    mb = _query_free_vram_mb()
+    _vram_cache.update(t=now, mb=mb)
+    return mb
+
+
+def recommended_num_ctx(ceiling: int, floor: int = 1024) -> int:
+    """Fenêtre de contexte adaptée à la VRAM LIBRE, bornée par `ceiling` (valeur
+    configurée = plafond souhaité). VRAM inconnue → on garde `ceiling`."""
+    free = free_vram_mb()
+    if free is None:
+        return ceiling
+    if free >= 5000:
+        rec = ceiling
+    elif free >= 3500:
+        rec = min(ceiling, 8192)
+    elif free >= 2200:
+        rec = min(ceiling, 4096)
+    elif free >= 1300:
+        rec = min(ceiling, 2048)
+    else:
+        rec = floor
+    return max(floor, min(rec, ceiling))
 
 
 def system_block() -> str:

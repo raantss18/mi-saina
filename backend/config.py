@@ -41,7 +41,10 @@ class Settings(BaseSettings):
     # Dossier de projet dont on injecte le MISAINA.md/README.md (vide = désactivé)
     PROJECT_DIR: str = ""
     # Fenêtre de contexte passée à Ollama (tokens). 8192 ≈ raisonnable sur 8 Go.
+    # Sert de PLAFOND quand NUM_CTX_AUTO est actif.
     NUM_CTX: int = 8192
+    # Adapter num_ctx à la VRAM LIBRE détectée (borné par NUM_CTX). False = fixe.
+    NUM_CTX_AUTO: bool = True
     # Budget de tokens des messages envoyés au modèle (garde-fou anti-saturation).
     MAX_CONTEXT_TOKENS: int = 5500
     # Résumer (extractif, sans LLM) l'historique élagué au lieu de le couper net,
@@ -78,7 +81,14 @@ EDITABLE_SETTINGS: dict = {
     "NUM_CTX": {
         "type": "int", "min": 1024, "max": 32768, "step": 512,
         "label": "Fenêtre de contexte Ollama (num_ctx)",
-        "help": "Tokens passés au modèle. 8192 ≈ raisonnable sur 8 Go de VRAM ; plus = plus de RAM/VRAM.",
+        "help": "Tokens passés au modèle. 8192 ≈ raisonnable sur 8 Go de VRAM ; plus = plus de RAM/VRAM. "
+                "Sert de plafond si l'adaptation auto est activée.",
+    },
+    "NUM_CTX_AUTO": {
+        "type": "bool",
+        "label": "Adapter num_ctx à la VRAM libre",
+        "help": "Réduit automatiquement la fenêtre de contexte quand la VRAM libre est faible "
+                "(borné par num_ctx ci-dessus). VRAM inconnue → valeur fixe.",
     },
     "MAX_CONTEXT_TOKENS": {
         "type": "int", "min": 1000, "max": 30000, "step": 250,

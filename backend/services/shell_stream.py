@@ -287,6 +287,62 @@ async def _reap(proc):
         pass
 
 
+# Signatures d'ÉCHEC sur stderr, indépendantes du bureau (KDE/GNOME/XFCE/…) et du
+# toolkit (Qt/GTK/xdg-open/gio). Volontairement ciblées « échec » — on NE matche
+# PAS les simples « warning » bénins que beaucoup d'applis émettent au démarrage.
+_GUI_ERROR_RE = re.compile(
+    r"no such file or directory"
+    r"|permission denied"
+    r"|cannot open|unable to open|failed to open"
+    r"|failed to (?:execute|start|launch|spawn)"
+    r"|command not found|: not found"
+    r"|no application (?:found|registered)|no method available"
+    r"|error while loading shared libraries"
+    r"|could not (?:open|find|load|display)"
+    r"|gio: .*: error|xdg-open: "
+    r"|cannot open display|could not connect to display"
+    r"|segmentation fault|core dumped",
+    re.IGNORECASE,
+)
+
+
+def _looks_like_gui_error(text: str) -> bool:
+    """La sortie d'erreur ressemble-t-elle à un ÉCHEC de lancement/ouverture
+    (et pas à un simple avertissement) ? Marche quel que soit le bureau."""
+    return bool(_GUI_ERROR_RE.search(text or ""))
+
+
+def _missing_open_target(inner: str) -> str | None:
+    """Pour un lanceur de fichier (xdg-open/kde-open/gio…), retourne le chemin
+    local de l'argument s'il N'EXISTE PAS (après auto-réparation en amont), sinon
+    None. Évite de lancer une ouverture vouée à échouer (et la boîte d'erreur)."""
+    if _command_head(inner) not in _OPEN_LAUNCHERS:
+        return None
+    try:
+        toks = shlex.split(inner)
+    except ValueError:
+        return None
+    if len(toks) < 2:
+        return None
+    arg = toks[-1]
+    if "://" in arg:                       # URL → pas un fichier local
+        return None
+    if not (arg.startswith("/") or arg.startswith("~") or arg.startswith("./")):
+        return None
+    return None if os.path.exists(os.path.expanduser(arg)) else arg
+
+
+async def _read_available(reader, timeout: float = 0.2) -> str:
+    """Lit ce qui est déjà disponible sur un flux sans bloquer si rien ne vient."""
+    if reader is None:
+        return ""
+    try:
+        data = await asyncio.wait_for(reader.read(8192), timeout)
+        return data.decode("utf-8", "replace")
+    except (asyncio.TimeoutError, Exception):
+        return ""
+
+
 async def launch_gui(cmd: str):
     """
     Lance une application graphique détachée et REMONTE les erreurs.
@@ -300,6 +356,14 @@ async def launch_gui(cmd: str):
     head = _command_head(inner)
     if repaired:
         yield {"type": "chunk", "text": f"↳ chemin corrigé : {repaired}\n"}
+
+    # Pré-vol : ouvrir un fichier qui n'existe pas échouera (et fera surgir une
+    # boîte d'erreur du bureau) → on le signale proprement sans rien lancer.
+    missing = _missing_open_target(inner)
+    if missing:
+        yield {"type": "chunk", "text": f"❌ Fichier introuvable : {missing}\n"}
+        yield {"type": "done", "returncode": 2}
+        return
     try:
         # `setsid -w` attend le programme → on récupère son vrai code de sortie
         # (xdg-open qui échoue ressort vite ; une fenêtre GUI qui reste ouverte
@@ -318,8 +382,17 @@ async def launch_gui(cmd: str):
     try:
         rc = await asyncio.wait_for(proc.wait(), timeout=2.5)
     except asyncio.TimeoutError:
-        # Toujours en cours = fenêtre GUI restée ouverte → succès, on la laisse vivre.
+        # Toujours en cours après le délai de grâce = une fenêtre est probablement
+        # restée ouverte. Mais ça peut être une BOÎTE D'ERREUR : on inspecte stderr
+        # (signatures multi-toolkit) pour départager un vrai lancement d'un échec.
+        err = (await _read_available(proc.stderr)).strip()
         asyncio.create_task(_reap(proc))
+        if err and _looks_like_gui_error(err):
+            yield {"type": "chunk",
+                   "text": f"⚠ Application lancée mais erreurs signalées "
+                           f"(vérifie qu'elle s'est ouverte correctement) :\n{err}\n"}
+            yield {"type": "done", "returncode": 0}
+            return
         yield {"type": "chunk", "text": f"🪟 Application graphique lancée : {inner}\n"}
         yield {"type": "done", "returncode": 0}
         return

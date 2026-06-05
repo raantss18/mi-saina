@@ -63,6 +63,7 @@ export default function Home() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillMenu, setSkillMenu] = useState(false);
   const [skillFilter, setSkillFilter] = useState("");
+  const [skillIndex, setSkillIndex] = useState(0);   // item surligné dans l'autocomplétion
   const [lastUserMsg, setLastUserMsg] = useState("");
   const [memoryRefresh, setMemoryRefresh] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
@@ -419,6 +420,7 @@ export default function Home() {
     if (val.startsWith("/")) {
       setSkillFilter(val.slice(1).toLowerCase());
       setSkillMenu(true);
+      setSkillIndex(0);   // repartir du 1er résultat à chaque frappe
     } else {
       setSkillMenu(false);
     }
@@ -629,11 +631,14 @@ export default function Home() {
             background: "var(--surface)", border: "1px solid var(--accent)",
             borderRadius: 8, zIndex: 50, overflow: "hidden", maxHeight: 200, overflowY: "auto",
           }}>
-            {filteredSkills.map(s => (
+            {filteredSkills.map((s, i) => (
               <div key={s.name} onClick={() => applySkill(s)}
-                style={{ padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}
-                onMouseEnter={e => (e.currentTarget.style.background = "var(--border)")}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                onMouseEnter={() => setSkillIndex(i)}
+                style={{
+                  padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                  borderBottom: "1px solid var(--border)",
+                  background: i === skillIndex ? "var(--border)" : "transparent",
+                }}
               >
                 <span style={{ fontSize: 16 }}>{s.icon}</span>
                 <div>
@@ -668,6 +673,15 @@ export default function Home() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={e => {
+                  // Navigation dans l'autocomplétion des slash-commands
+                  if (skillMenu && filteredSkills.length > 0) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setSkillIndex(i => Math.min(i + 1, filteredSkills.length - 1)); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setSkillIndex(i => Math.max(i - 1, 0)); return; }
+                    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                      e.preventDefault(); applySkill(filteredSkills[skillIndex]); return;
+                    }
+                    if (e.key === "Escape") { e.preventDefault(); setSkillMenu(false); return; }
+                  }
                   // Entrée = envoyer · Maj+Entrée = nouvelle ligne
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
                   if (e.key === "Escape") { setSkillMenu(false); }

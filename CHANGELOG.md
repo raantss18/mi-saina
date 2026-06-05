@@ -3,11 +3,14 @@
 ## [Non publié]
 
 ### Ajouté
+- **`num_ctx` adaptatif selon la VRAM libre** : la fenêtre de contexte est réduite automatiquement quand la VRAM libre baisse (paliers), bornée par `NUM_CTX` (= plafond souhaité). Détection agnostique du GPU (NVIDIA via `nvidia-smi`, AMD via sysfs `amdgpu`, cache 15 s). Toggle `NUM_CTX_AUTO` (défaut on) dans l'UI Config ; VRAM inconnue → valeur fixe. Couvert par `tests/test_num_ctx.py`.
+- **Auto-complétion clavier des slash-commands** : dans le menu `/…`, navigation ↑/↓, **Tab** ou **Entrée** pour valider l'item surligné, **Échap** pour fermer ; surbrillance synchronisée avec la souris. (Complète l'édition multi-ligne déjà ajoutée.)
 - **Liste cliquable à l'ouverture ambiguë** : quand on demande d'ouvrir un fichier dont le chemin n'existe pas mais que **plusieurs** fichiers proches existent, mi-saina ne devine plus — il propose une **liste cliquable** (modal). L'ouverture se fait sur le fichier choisi. S'il n'y a 0 ou 1 candidat, le flux normal (auto-réparation) opère. Round-trip backend interruptible par ⏹ (comme la fenêtre sudo). Couvert par `tests/test_shell_open_choices.py`.
 - **Bouton « Tout valider »** dans la fenêtre de confirmation : approuve la commande **et toutes les suivantes de la tâche en cours** (utile en mode `CONFIRM_MODE=all` ou pour une tâche multi-commandes risquées). Couvert par `tests/test_chat_confirm.py`.
 - **Tests shell_stream** complétés (GUI `launch_gui`, auto-réparation de chemin) — `tests/test_shell_repair.py`.
 
 ### Corrigé
+- **Lancement GUI : vrai succès vs échec, agnostique du bureau** : ouvrir un fichier inexistant est désormais signalé proprement **sans rien lancer** (plus de boîte d'erreur du bureau) ; et quand une fenêtre reste ouverte après le délai de grâce, `stderr` est inspecté avec des signatures d'échec **multi-toolkit** (Qt/GTK/xdg-open/gio, pas seulement KDE) pour distinguer un vrai lancement d'une boîte d'erreur — sans matcher les avertissements bénins de démarrage. Couvert par `tests/test_shell_repair.py`.
 - **Timeout shell tuant les longues commandes (maj système, gros téléchargements)** : `stream_pty` coupait toute commande après **600 s de temps total**, ce qui interrompait un `paru -Syu` de plusieurs Go en plein milieu. Le timeout est désormais basé sur l'**inactivité** : on ne coupe que si la commande ne produit **aucune sortie** pendant `SHELL_IDLE_TIMEOUT` (défaut 600 s, réglable dans l'UI Config). Un téléchargement qui progresse sort en continu → jamais coupé tant qu'il avance (⏹ reste disponible pour arrêter à la main). De plus, l'arrêt sur timeout tue désormais tout le **groupe de processus** (`killpg`/SIGKILL) au lieu du seul shell, pour ne pas laisser `pacman` orphelin. NB : pacman met les paquets complets en cache (`/var/cache/pacman/pkg`), donc une reprise ne re-télécharge que le paquet interrompu.
 
 ### Ajouté
