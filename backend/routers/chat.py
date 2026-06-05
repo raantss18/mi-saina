@@ -13,7 +13,7 @@ from services.memory import (
     update_session_title, session_message_count,
 )
 from services.shell_stream import stream_pty, is_destructive
-from services.planner import should_plan, plan_task, fit_budget
+from services.planner import should_plan, plan_task, fit_budget, reference_hint
 from services import diagnostics, userctx
 from services.sysinfo import system_block
 
@@ -534,7 +534,8 @@ async def chat_ws(websocket: WebSocket):
             if len(subtasks) > 1:
                 await websocket.send_text(json.dumps({"type": "plan", "subtasks": subtasks}))
                 system_prompt = _load_system_prompt()
-                scratch = ""   # mémoire partagée minuscule entre sous-tâches
+                scratch = ""           # mémoire partagée minuscule entre sous-tâches
+                prev_cmds: list[str] = []   # commandes réussies (pour résoudre les référents)
                 for i, sub in enumerate(subtasks):
                     await websocket.send_text(json.dumps({
                         "type": "subtask_start", "index": i + 1,
@@ -545,6 +546,10 @@ async def chat_ws(websocket: WebSocket):
                     if scratch:
                         sub_msgs.append({"role": "user",
                                          "content": "[CONTEXTE DES ÉTAPES PRÉCÉDENTES]\n" + scratch})
+                    # Référent pendant (« compile-le ») → pointer le dernier artefact
+                    hint = reference_hint(sub, prev_cmds)
+                    if hint:
+                        sub_msgs.append({"role": "user", "content": hint})
                     sub_msgs.append({"role": "user",
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
                     stopped, last, ex = await _run_agent_loop(
@@ -552,7 +557,12 @@ async def chat_ws(websocket: WebSocket):
                     executed += ex
                     if stopped:
                         break
-                    scratch = (scratch + f"- {sub} → {last.strip()[:300]}\n")[-1500:]
+                    # Scratch enrichi : résumé textuel + commandes concrètes exécutées
+                    # (ce sont elles qui portent les chemins/artefacts réutilisables).
+                    done_cmds = [c for c, rc in ex if rc == 0]
+                    prev_cmds += done_cmds
+                    cmd_note = ("\n  ↳ commandes : " + " ; ".join(done_cmds[-3:])) if done_cmds else ""
+                    scratch = (scratch + f"- {sub} → {last.strip()[:200]}{cmd_note}\n")[-1800:]
             else:
                 # Chemin simple : contexte complet (avec mémoire), élagué au budget
                 messages = _build_messages(history, subtasks[0], memory_context, attachments)

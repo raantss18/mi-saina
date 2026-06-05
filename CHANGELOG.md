@@ -2,6 +2,9 @@
 
 ## [Non publié]
 
+### Ajouté
+- **Résolution de référents entre sous-tâches** : chaque sous-tâche s'exécutant dans un contexte neuf, un pronom qui renvoie à l'étape précédente (« compile-**le** », « ouvre-**la** », « lance ça ») n'avait aucun référent. Désormais (1) le scratch partagé conserve les **commandes concrètes** réussies de chaque étape (pas seulement un résumé textuel), et (2) quand une sous-tâche contient un référent pendant, un indice `[RÉFÉRENCE]` pointant le **dernier artefact** (chemin de fichier produit) est injecté avant la sous-tâche. Détection volontairement stricte (les articles « le/la/les + nom » ne déclenchent rien). Helpers déterministes `has_dangling_reference` / `last_artifact` / `reference_hint` dans `services.planner`, couverts par `tests/test_planner_refs.py`.
+
 ### Supprimé
 - **Endpoint REST `POST /chat/complete`** (et le modèle `ChatRequest`) : code mort et divergent — le frontend ne passe que par le WebSocket `/chat/ws`. Ce chemin ne disposait ni de la boucle agentique, ni de la gestion GUI, ni de la validation/sudo, et constituait un piège (comportement différent du WS). Retiré ; `services.shell_exec.execute_command` reste utilisé par l'endpoint `/shell`.
 

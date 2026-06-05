@@ -232,3 +232,59 @@ async def plan_task(user_input: str) -> list[str]:
         if len(tasks) > 1:
             return tasks
     return rule_split(user_input)
+
+
+# ── Résolution de référents entre sous-tâches (« compile-le », « ouvre-la ») ──
+# Chaque sous-tâche est exécutée dans un contexte NEUF : un pronom qui renvoie au
+# résultat de l'étape précédente (le fichier créé, etc.) est sinon irrésolu.
+# On détecte ces référents pendants (haute précision) et on pointe explicitement
+# le dernier artefact concret produit par les commandes précédentes.
+
+# Enclitique attaché à un verbe (compile-le, ouvre-la, lance-les, fais-le…) +
+# démonstratifs autonomes. Volontairement strict pour éviter les faux positifs
+# avec « le/la/les » articles (« ouvre le fichier main.c » ne matche pas).
+_DANGLING_RE = re.compile(
+    r"\w+-(?:le|la|les|l[ae]|y|en|moi|lui|leur)\b"
+    r"|\b(?:[çc]a|cela|celui-ci|celle-ci|ceux-ci|celles-ci|"
+    r"ce\s+dernier|cette\s+derni[èe]re|le\s+m[êe]me|la\s+m[êe]me)\b",
+    re.IGNORECASE,
+)
+
+# Jeton ressemblant à un chemin de fichier : ~/…, ./…, /…, ou nom.ext
+_PATH_TOKEN_RE = re.compile(
+    r"(?:~|\.{1,2})?/[\w.\-/]+"          # ~/x, ./x, ../x, /x
+    r"|\b[\w.\-/]+\.[A-Za-z0-9]{1,8}\b"  # fichier avec extension (main.c, app.py)
+)
+
+
+def has_dangling_reference(text: str) -> bool:
+    """La sous-tâche contient-elle un pronom/référent qui dépend d'une étape
+    précédente (ex. « compile-le », « ouvre-la », « lance ça ») ?"""
+    return bool(_DANGLING_RE.search(text or ""))
+
+
+def last_artifact(prev_cmds: list[str]) -> str:
+    """Dernier artefact concret (chemin de fichier) cité dans les commandes déjà
+    exécutées — c'est le candidat le plus probable pour résoudre un pronom."""
+    for cmd in reversed(prev_cmds or []):
+        paths = _PATH_TOKEN_RE.findall(cmd)
+        # On écarte les options (-x) et binaires sans chemin : on veut un vrai fichier
+        paths = [p for p in paths if "/" in p or "." in p.lstrip(".")]
+        if paths:
+            return paths[-1]
+    return ""
+
+
+def reference_hint(sub: str, prev_cmds: list[str]) -> str:
+    """Indice à injecter avant une sous-tâche au référent pendant. Vide si rien à
+    résoudre (pas de pronom, ou aucun artefact connu)."""
+    if not has_dangling_reference(sub):
+        return ""
+    art = last_artifact(prev_cmds)
+    if not art:
+        return ""
+    return (
+        "[RÉFÉRENCE] Un pronom de cette sous-tâche (« le / la / -le … ») renvoie "
+        f"très probablement à l'élément produit à l'étape précédente : {art}. "
+        "Utilise ce chemin explicitement plutôt que le pronom."
+    )
