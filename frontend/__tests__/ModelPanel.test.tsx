@@ -19,11 +19,11 @@ function mockFetch(data: unknown, ok = true) {
 }
 
 describe("ModelPanel — loading state", () => {
-  it("shows 'Chargement...' before fetch resolves", () => {
+  it("shows the loading state before fetch resolves", () => {
     // Use a fetch that never resolves during this check
     (global as any).fetch = vi.fn().mockReturnValue(new Promise(() => {}));
     render(<ModelPanel onModelChange={() => {}} />);
-    expect(screen.getByText("Chargement...")).toBeInTheDocument();
+    expect(screen.getByText(/Chargement des modèles/)).toBeInTheDocument();
   });
 });
 

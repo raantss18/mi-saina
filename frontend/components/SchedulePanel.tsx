@@ -64,7 +64,13 @@ export default function SchedulePanel({ onOpenSession }: { onOpenSession?: (id: 
         Tâches planifiées (locales). Exécutées en arrière-plan sans interface : seules les commandes <b>sûres</b> tournent (ni root, ni suppression — personne pour valider). Le résultat est sauvé dans une session « ⏰ ».
       </div>
 
-      {jobs.length === 0 && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Aucune tâche planifiée.</div>}
+      {jobs.length === 0 && !adding && (
+        <div className="ms-empty">
+          <span className="ms-empty-icon">⏰</span>
+          <div>Aucune tâche planifiée.</div>
+          <div style={{ fontSize: 11, opacity: 0.8 }}>Crée une tâche récurrente ci-dessous (ex : résumer les mises à jour chaque matin).</div>
+        </div>
+      )}
 
       {jobs.map(j => (
         <div key={j.id} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", opacity: j.enabled ? 1 : 0.55 }}>
@@ -113,7 +119,7 @@ export default function SchedulePanel({ onOpenSession }: { onOpenSession?: (id: 
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={create} disabled={!name.trim() || !prompt.trim()}
-              style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Créer</button>
+              style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Créer</button>
             <button onClick={() => setAdding(false)} style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>Annuler</button>
           </div>
         </div>

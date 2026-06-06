@@ -110,7 +110,7 @@ function ShellStreamBlock({
           <button
             onClick={submitInput}
             style={{
-              background: "var(--accent)", border: "none", color: "#000",
+              background: "var(--accent)", border: "none", color: "var(--accent-contrast)",
               padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700,
             }}
           >

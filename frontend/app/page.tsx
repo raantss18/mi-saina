@@ -511,7 +511,7 @@ export default function Home() {
   const btnStyle = (active = false, danger = false): React.CSSProperties => ({
     background: active ? "var(--accent)" : danger ? "rgba(248,81,73,0.15)" : "var(--border)",
     border: danger ? "1px solid var(--red)" : "none",
-    color: active ? "#000" : danger ? "var(--red)" : "var(--text-muted)",
+    color: active ? "var(--accent-contrast)" : danger ? "var(--red)" : "var(--text-muted)",
     padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11,
     fontWeight: active ? 700 : 400, whiteSpace: "nowrap" as const,
   });
@@ -543,7 +543,8 @@ export default function Home() {
             ☰
           </button>
           <span style={{ color: "var(--text-muted)", fontSize: 10 }}>modèle:</span>
-          <span style={{ background: "var(--border)", padding: "2px 8px", borderRadius: 12, fontSize: 11, color: "var(--accent)" }}>
+          <span title="Modèle actif — change-le dans ⬡ Modèles"
+            style={{ background: "var(--border)", padding: "2px 8px", borderRadius: 12, fontSize: 11, color: "var(--accent)" }}>
             {activeModel}
           </span>
 
@@ -779,7 +780,7 @@ export default function Home() {
                 style={{
                   background: connected && (input.trim() || attachments.length) ? "var(--accent)" : "var(--border)",
                   border: "none",
-                  color: connected && (input.trim() || attachments.length) ? "#000" : "var(--text-muted)",
+                  color: connected && (input.trim() || attachments.length) ? "var(--accent-contrast)" : "var(--text-muted)",
                   padding: "8px 16px", borderRadius: 6, cursor: "pointer",
                   fontSize: 13, fontWeight: 700, transition: "background 0.15s",
                 }}>
@@ -828,7 +829,7 @@ export default function Home() {
                 Annuler
               </button>
               <button onClick={handleSudoSubmit}
-                style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 Confirmer
               </button>
             </div>
@@ -849,7 +850,7 @@ export default function Home() {
                 Refuser
               </button>
               <button onClick={() => respondConfirm(true)}
-                style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 Exécuter
               </button>
               <button onClick={() => respondConfirm(true, true)}

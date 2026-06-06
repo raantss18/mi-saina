@@ -24,6 +24,66 @@ fn toggle_main(app: &tauri::AppHandle) {
     }
 }
 
+// ───────────────────────── Backend géré par l'appli (autonomie) ─────────────
+// Si le backend n'est pas déjà actif (ex. service systemd), l'appli le démarre
+// elle-même depuis le venv local et l'arrête en quittant. Pour ta machine où
+// systemd sert déjà le backend, c'est un no-op. Désactivable : MS_NO_BACKEND_SPAWN.
+#[cfg(desktop)]
+mod backend {
+    use std::net::{SocketAddr, TcpStream};
+    use std::path::PathBuf;
+    use std::process::{Child, Command, Stdio};
+    use std::time::Duration;
+
+    pub const PORT: u16 = 8000;
+
+    pub fn is_up(port: u16) -> bool {
+        let addr: SocketAddr = ([127, 0, 0, 1], port).into();
+        TcpStream::connect_timeout(&addr, Duration::from_millis(400)).is_ok()
+    }
+
+    // <repo>/backend, déduit du chemin de l'exécutable
+    // (<repo>/frontend/src-tauri/target/{debug,release}/mi-saina).
+    fn backend_dir() -> Option<PathBuf> {
+        let exe = std::env::current_exe().ok()?;
+        let repo = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
+        let dir = repo.join("backend");
+        if dir.join("main.py").exists() {
+            Some(dir)
+        } else {
+            None
+        }
+    }
+
+    fn find_uvicorn() -> Option<PathBuf> {
+        let home = std::env::var_os("HOME")?;
+        for venv in ["mi-saina-env", "localmind-env"] {
+            let p = PathBuf::from(&home).join(venv).join("bin").join("uvicorn");
+            if p.exists() {
+                return Some(p);
+            }
+        }
+        None
+    }
+
+    // Démarre le backend si possible. Renvoie le process enfant à arrêter en sortie.
+    pub fn spawn(port: u16) -> Option<Child> {
+        let dir = backend_dir()?;
+        let uvicorn = find_uvicorn()?;
+        Command::new(uvicorn)
+            .args(["main:app", "--host", "127.0.0.1", "--port", &port.to_string()])
+            .current_dir(dir)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok()
+    }
+}
+
+// Process backend géré, arrêté proprement à la fermeture de l'appli.
+#[cfg(desktop)]
+struct BackendProc(std::sync::Mutex<Option<std::process::Child>>);
+
 pub fn run() {
     let mut builder = tauri::Builder::default();
 
@@ -53,8 +113,20 @@ pub fn run() {
             .plugin(tauri_plugin_global_shortcut::Builder::new().build());
     }
 
-    builder
+    let app = builder
         .setup(|app| {
+            // Backend autonome : démarre le serveur s'il n'est pas déjà actif.
+            #[cfg(desktop)]
+            {
+                let spawn_allowed = std::env::var_os("MS_NO_BACKEND_SPAWN").is_none();
+                let child = if spawn_allowed && !backend::is_up(backend::PORT) {
+                    backend::spawn(backend::PORT)
+                } else {
+                    None
+                };
+                app.manage(BackendProc(std::sync::Mutex::new(child)));
+            }
+
             // Menu de l'icône de la barre système (tray)
             let show = MenuItem::with_id(app, "show", "Afficher mi-saina", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
@@ -111,6 +183,21 @@ pub fn run() {
                 api.prevent_close();
             }
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("erreur au démarrage de mi-saina");
+
+    app.run(|_app_handle, _event| {
+        // À la sortie de l'appli, arrête le backend qu'on a éventuellement démarré.
+        #[cfg(desktop)]
+        if let tauri::RunEvent::Exit = _event {
+            if let Some(state) = _app_handle.try_state::<BackendProc>() {
+                if let Ok(mut guard) = state.0.lock() {
+                    if let Some(child) = guard.as_mut() {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                }
+            }
+        }
+    });
 }

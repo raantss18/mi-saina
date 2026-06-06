@@ -80,8 +80,10 @@ export default function TerminalPanel({
         fontFamily: "monospace", fontSize: 11, lineHeight: 1.45,
       }}>
         {entries.length === 0 && (
-          <div style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
-            Aucune commande exécutée pour l’instant.
+          <div className="ms-empty" style={{ fontFamily: "var(--font-ui)" }}>
+            <span className="ms-empty-icon">▣</span>
+            <div>Aucune commande exécutée pour l’instant.</div>
+            <div style={{ fontSize: 11, opacity: 0.8 }}>La sortie des commandes apparaîtra ici en temps réel.</div>
           </div>
         )}
         {entries.map((e, i) => {
@@ -143,7 +145,7 @@ export default function TerminalPanel({
             }}
           />
           <button onClick={send}
-            style={{ background: "var(--accent)", border: "none", color: "#000", padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+            style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
             ↵
           </button>
         </div>

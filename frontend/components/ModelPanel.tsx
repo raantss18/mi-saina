@@ -154,23 +154,32 @@ export default function ModelPanel({ onModelChange }: Props) {
 
       {/* Liste des modèles */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {models.length === 0 && <div style={{ fontSize: 11, color: "var(--text-muted)" }}>Chargement...</div>}
+        {models.length === 0 && (
+          <div className="ms-empty">
+            <span className="ms-empty-icon" style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
+            Chargement des modèles…
+          </div>
+        )}
         {models.map(m => {
           const d = desc(m.name);
           const isActive = m.active;
           const isBusy = actionModel === m.name;
           return (
-            <div key={m.name} style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
-              borderRadius: 6, border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
-              background: isActive ? "rgba(127,184,154,0.06)" : "var(--bg)",
-            }}>
+            <div key={m.name}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.borderColor = "var(--border-strong)"; }}
+              onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = "var(--border)"; }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
+                borderRadius: 8, border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+                background: isActive ? "rgba(127,184,154,0.06)" : "var(--bg)",
+                transition: "border-color 0.15s ease",
+              }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 12, color: isActive ? "var(--accent)" : "var(--text)", fontWeight: isActive ? 700 : 400 }}>
                     {d.label}
                   </span>
-                  {isActive && <span style={{ fontSize: 9, background: "var(--accent)", color: "#000", borderRadius: 3, padding: "1px 5px" }}>ACTIF</span>}
+                  {isActive && <span style={{ fontSize: 9, background: "var(--accent)", color: "var(--accent-contrast)", borderRadius: 3, padding: "1px 5px" }}>ACTIF</span>}
                   <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto" }}>{m.size_gb}GB</span>
                 </div>
                 <div style={{ display: "flex", gap: 3, marginTop: 3, flexWrap: "wrap" }}>
@@ -184,6 +193,7 @@ export default function ModelPanel({ onModelChange }: Props) {
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                 {!isActive && (
                   <button onClick={() => handleSelect(m.name)} disabled={busy}
+                    title="Utiliser ce modèle pour les réponses"
                     style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}>
                     Activer
                   </button>
@@ -227,9 +237,10 @@ export default function ModelPanel({ onModelChange }: Props) {
           <button
             onClick={() => handlePullOrUpdate(pullInput.trim(), false)}
             disabled={busy || !pullInput.trim()}
+            title="Télécharger ce modèle depuis Ollama Hub"
             style={{
               background: !busy && pullInput.trim() ? "var(--accent)" : "var(--border)",
-              border: "none", color: !busy && pullInput.trim() ? "#000" : "var(--text-muted)",
+              border: "none", color: !busy && pullInput.trim() ? "var(--accent-contrast)" : "var(--text-muted)",
               padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600,
             }}
           >

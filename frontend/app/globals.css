@@ -109,3 +109,38 @@ kbd {
 /* Focus visible cohérent */
 button, input, textarea, select { font-family: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 6px; }
+
+/* ───────────────────────── Polish global (cohérence) ─────────────────────────
+   Transitions et états (hover/disabled) appliqués à tous les contrôles, sans
+   toucher aux styles inline existants. */
+button { transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.12s ease, opacity 0.12s ease; }
+button:not(:disabled):hover { filter: brightness(1.08); }
+button:not(:disabled):active { transform: translateY(0.5px); }
+button:disabled { opacity: 0.55; }
+
+input, textarea, select { transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+
+/* ── Utilitaires de composants réutilisables ──────────────────────────── */
+.ms-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.06s ease;
+}
+.ms-card-hover { cursor: pointer; }
+.ms-card-hover:hover { border-color: var(--border-strong); background: var(--surface-2); }
+
+/* Libellé de section (majuscules discrètes) */
+.ms-section {
+  font-size: 10px; letter-spacing: 0.8px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase;
+}
+
+/* État vide soigné (icône + message centrés) */
+.ms-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center; color: var(--text-muted); font-size: 12px;
+  padding: 40px 16px;
+}
+.ms-empty-icon { font-size: 28px; opacity: 0.6; line-height: 1; }

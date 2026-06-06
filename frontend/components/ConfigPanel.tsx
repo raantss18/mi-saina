@@ -12,6 +12,13 @@ interface Skill {
   prompt: string;
 }
 
+const TAB_HINTS: Record<"prompt" | "skills" | "memory" | "settings", string> = {
+  prompt: "Instructions de base envoyées au modèle à chaque conversation",
+  skills: "Raccourcis slash-command réutilisables (ex : /update)",
+  memory: "Contexte global et profil utilisateur injectés automatiquement",
+  settings: "Comportement de l'agent : confirmations, contexte, planificateur…",
+};
+
 export default function ConfigPanel() {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savedPrompt, setSavedPrompt] = useState("");
@@ -126,11 +133,13 @@ export default function ConfigPanel() {
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6 }}>
         {(["prompt", "skills", "memory", "settings"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{
-            padding: "4px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11,
-            background: tab === t ? "var(--accent)" : "var(--border)",
-            border: "none", color: tab === t ? "#000" : "var(--text)", fontWeight: tab === t ? 700 : 400,
-          }}>
+          <button key={t} onClick={() => setTab(t)}
+            title={TAB_HINTS[t]}
+            style={{
+              padding: "4px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11,
+              background: tab === t ? "var(--accent)" : "var(--border)",
+              border: "none", color: tab === t ? "var(--accent-contrast)" : "var(--text)", fontWeight: tab === t ? 700 : 400,
+            }}>
             {t === "prompt" ? "System Prompt" : t === "skills" ? "Skills" : t === "memory" ? "Mémoire" : "Réglages"}
           </button>
         ))}
@@ -159,7 +168,7 @@ export default function ConfigPanel() {
               disabled={saving || !isDirty}
               style={{
                 background: isDirty ? "var(--accent)" : "var(--border)",
-                border: "none", color: isDirty ? "#000" : "var(--text-muted)",
+                border: "none", color: isDirty ? "var(--accent-contrast)" : "var(--text-muted)",
                 padding: "6px 16px", borderRadius: 4, cursor: isDirty ? "pointer" : "default",
                 fontSize: 12, fontWeight: 700,
               }}
@@ -270,7 +279,7 @@ export default function ConfigPanel() {
                 <button onClick={() => saveSkill(editSkill)}
                   disabled={!editSkill.name || !editSkill.trigger || !editSkill.prompt}
                   style={{
-                    background: "var(--accent)", border: "none", color: "#000",
+                    background: "var(--accent)", border: "none", color: "var(--accent-contrast)",
                     padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700,
                   }}>
                   Sauvegarder
@@ -310,7 +319,7 @@ export default function ConfigPanel() {
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={saveMemory}
-              style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+              style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
               Sauvegarder
             </button>
             {memOk && <span style={{ fontSize: 11, color: "var(--green)" }}>{memOk}</span>}
@@ -387,7 +396,7 @@ export default function ConfigPanel() {
           {Object.keys(setSchema).length > 0 && (
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button onClick={saveSettings}
-                style={{ background: "var(--accent)", border: "none", color: "#000", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
                 Sauvegarder
               </button>
               {setOk && <span style={{ fontSize: 11, color: setOk.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{setOk}</span>}

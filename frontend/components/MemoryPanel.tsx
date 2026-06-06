@@ -33,11 +33,11 @@ interface Props {
   onNavigate?: (panel: NavPanel) => void;
 }
 
-const NAV: { id: NavPanel; icon: string; label: string }[] = [
-  { id: null, icon: "💬", label: "Chat" },
-  { id: "models", icon: "⬡", label: "Modèles" },
-  { id: "config", icon: "⚙", label: "Config" },
-  { id: "schedule", icon: "⏰", label: "Tâches" },
+const NAV: { id: NavPanel; icon: string; label: string; hint: string }[] = [
+  { id: null, icon: "💬", label: "Chat", hint: "Revenir à la conversation" },
+  { id: "models", icon: "⬡", label: "Modèles", hint: "Gérer les modèles Ollama (activer, télécharger, mettre à jour)" },
+  { id: "config", icon: "⚙", label: "Config", hint: "System prompt, skills, mémoire et réglages" },
+  { id: "schedule", icon: "⏰", label: "Tâches", hint: "Tâches planifiées exécutées en arrière-plan" },
 ];
 
 export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSession, refreshKey = 0, activePanel = null, onNavigate }: Props) {
@@ -125,6 +125,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
               <button
                 key={item.label}
                 onClick={() => onNavigate?.(item.id)}
+                title={item.hint}
                 style={{
                   display: "flex", alignItems: "center", gap: 8, width: "100%",
                   padding: "6px 8px", borderRadius: 6, cursor: "pointer", fontSize: 12,
@@ -144,6 +145,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
 
         <button
           onClick={handleNew}
+          title="Démarrer une nouvelle conversation vierge"
           style={{
             width: "100%", padding: "6px", background: "var(--accent-dim, #20342a)",
             border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 4,
@@ -164,6 +166,8 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
           <div
             key={s.id}
             onClick={() => onSelectSession(s.id)}
+            onMouseEnter={e => { if (s.id !== activeSessionId) e.currentTarget.style.background = "var(--surface-2)"; }}
+            onMouseLeave={e => { if (s.id !== activeSessionId) e.currentTarget.style.background = "transparent"; }}
             style={{
               padding: "8px 12px",
               cursor: "pointer",
@@ -173,6 +177,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
               justifyContent: "space-between",
               alignItems: "flex-start",
               gap: 4,
+              transition: "background 0.12s ease",
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
