@@ -1,4 +1,8 @@
-# mi-saina — Assistant IA local
+<p align="center">
+  <img src="logo/mi-saina-logo.png" alt="mi-saina" width="360">
+</p>
+
+<h1 align="center">mi-saina — Assistant IA local</h1>
 
 **mi-saina** est un assistant IA local **créé par Antsa**, qui tourne **100 % sur ta machine** grâce à [Ollama](https://ollama.com). Aucune donnée n'est envoyée dans le cloud. Il a un accès complet à ton ordinateur Linux : exécution de commandes shell en temps réel, gestion de fichiers, recherche web, mémoire des conversations, et outils externes (MCP).
 

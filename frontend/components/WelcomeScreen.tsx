@@ -37,6 +37,9 @@ export default function WelcomeScreen({ onPick }: Props) {
       justifyContent: "center", padding: "24px", gap: 20, overflowY: "auto",
     }}>
       <div style={{ textAlign: "center" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/mi-saina-icon.png" alt="mi-saina" width={72} height={72}
+          style={{ borderRadius: 18, marginBottom: 12, boxShadow: "var(--shadow)" }} />
         <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", letterSpacing: -0.5 }}>mi-saina</div>
         <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 6 }}>
           Votre assistant IA local — il comprend, agit sur votre système, et apprend.

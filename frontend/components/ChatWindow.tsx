@@ -38,7 +38,7 @@ function ShellStreamBlock({
   const running = msg.shellStreaming;
 
   const borderColor = !done ? "var(--accent)" : ok ? "var(--green)" : "var(--red)";
-  const headerBg = !done ? "rgba(88,166,255,0.08)" : ok ? "rgba(63,185,80,0.08)" : "rgba(248,81,73,0.08)";
+  const headerBg = !done ? "rgba(127,184,154,0.08)" : ok ? "rgba(63,185,80,0.08)" : "rgba(248,81,73,0.08)";
 
   const submitInput = () => {
     if (inputVal.trim() !== "" || inputVal === "") {
@@ -93,7 +93,7 @@ function ShellStreamBlock({
           borderTop: `1px solid ${borderColor}33`,
           padding: "6px 10px",
           display: "flex", gap: 6, alignItems: "center",
-          background: "rgba(88,166,255,0.04)",
+          background: "rgba(127,184,154,0.04)",
         }}>
           <span style={{ color: "var(--accent)", fontSize: 12 }}>›</span>
           <input
@@ -177,7 +177,7 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
           return (
             <div key={i} style={{
               alignSelf: "center", maxWidth: "92%", width: "100%",
-              background: "rgba(88,166,255,0.06)", border: "1px dashed var(--accent)",
+              background: "rgba(127,184,154,0.06)", border: "1px dashed var(--accent)",
               borderRadius: 8, padding: "8px 12px", margin: "2px 0",
               fontSize: 12, color: "var(--text-muted)", whiteSpace: "pre-wrap",
               fontFamily: "var(--font-mono, monospace)",
@@ -202,7 +202,7 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
             <div style={{
               maxWidth: "80%", padding: "10px 14px",
               borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
-              background: msg.role === "user" ? "rgba(88,166,255,0.12)" : "var(--surface)",
+              background: msg.role === "user" ? "rgba(127,184,154,0.12)" : "var(--surface)",
               border: msg.role === "user" ? "1px solid var(--accent)" : "1px solid var(--border)",
               fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>

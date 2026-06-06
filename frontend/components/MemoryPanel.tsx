@@ -111,8 +111,10 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
       flexShrink: 0,
     }}>
       <div style={{ padding: "12px 10px 8px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>
-          mi-saina
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/mi-saina-icon.png" alt="mi-saina" width={22} height={22} style={{ borderRadius: 5 }} />
+          <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, letterSpacing: 0.2 }}>mi-saina</span>
         </div>
 
         {/* Navigation : Chat / Modèles / Config / Tâches */}
@@ -143,7 +145,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
         <button
           onClick={handleNew}
           style={{
-            width: "100%", padding: "6px", background: "var(--accent-dim, #1f3158)",
+            width: "100%", padding: "6px", background: "var(--accent-dim, #20342a)",
             border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 4,
             cursor: "pointer", fontSize: 12,
           }}

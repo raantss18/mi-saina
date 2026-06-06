@@ -163,7 +163,7 @@ export default function ModelPanel({ onModelChange }: Props) {
             <div key={m.name} style={{
               display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
               borderRadius: 6, border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
-              background: isActive ? "rgba(88,166,255,0.06)" : "var(--bg)",
+              background: isActive ? "rgba(127,184,154,0.06)" : "var(--bg)",
             }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -192,7 +192,7 @@ export default function ModelPanel({ onModelChange }: Props) {
                   onClick={() => handlePullOrUpdate(m.name, true)}
                   disabled={busy}
                   title="Vérifier et télécharger les mises à jour"
-                  style={{ background: isBusy && actionType === "update" ? "rgba(88,166,255,0.2)" : "var(--border)", border: "none", color: "var(--accent)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}
+                  style={{ background: isBusy && actionType === "update" ? "rgba(127,184,154,0.2)" : "var(--border)", border: "none", color: "var(--accent)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}
                 >
                   {isBusy && actionType === "update" ? "..." : "↻"}
                 </button>

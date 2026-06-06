@@ -128,7 +128,7 @@ export default function TerminalPanel({
         <div style={{
           borderTop: `1px solid ${awaiting ? "var(--accent)" : "var(--border)"}`,
           padding: "6px 10px", display: "flex", gap: 6, alignItems: "center",
-          background: awaiting ? "rgba(88,166,255,0.08)" : "var(--surface)",
+          background: awaiting ? "rgba(127,184,154,0.08)" : "var(--surface)",
         }}>
           <span style={{ color: "var(--accent)", fontSize: 12 }}>›</span>
           <input
