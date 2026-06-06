@@ -17,10 +17,12 @@ from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
 from services import diagnostics, userctx, mcp_client
 from services.sysinfo import system_block
+from services.web_search import search_web
 
 router = APIRouter()
 
 EXEC_RE = re.compile(r'\[EXEC:\s*(.*?)\]', re.DOTALL)
+SEARCH_RE = re.compile(r'\[SEARCH:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
@@ -448,6 +450,34 @@ async def _inject_redirects(redirects: list[str], messages: list, websocket: Web
                          "content": f"[NOUVELLE INSTRUCTION DE L'UTILISATEUR — prends-la en compte maintenant] {tx}"})
 
 
+async def _run_search(query: str, websocket: WebSocket) -> tuple[str, str, int]:
+    """Exécute une recherche web et renvoie (label, résultats_formatés, rc) pour
+    réinjection au modèle (il peut ensuite fetch/télécharger les URLs trouvées)."""
+    label = f"SEARCH: {query}"
+    await websocket.send_text(json.dumps({"type": "shell_start", "command": label}))
+    try:
+        results = await asyncio.to_thread(search_web, query)
+    except Exception as e:
+        results = []
+        err = str(e)
+    else:
+        err = ""
+    if results:
+        lines = [f"{i+1}. {r.get('title','')}\n   {r.get('url','')}\n   {r.get('snippet','')}"
+                 for i, r in enumerate(results)]
+        out = "\n".join(lines)
+        rc = 0
+    else:
+        out = f"(aucun résultat{' — ' + err if err else ''})"
+        rc = 1
+    await websocket.send_text(json.dumps({
+        "type": "shell_done", "command": label, "returncode": rc,
+        "status": "success" if rc == 0 else "failure",
+        "logical_failure": False, "status_reason": None,
+    }))
+    return label, out, rc
+
+
 async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
                           persist: bool = True,
@@ -484,7 +514,8 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
 
         cmds = [c.strip() for c in EXEC_RE.findall(full_response) if c.strip()]
         mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
-        if not cmds and not mcp_calls:
+        searches = [q.strip() for q in SEARCH_RE.findall(full_response) if q.strip()]
+        if not cmds and not mcp_calls and not searches:
             # Pas d'action : si l'utilisateur a redirigé pendant la réponse, on continue
             redirects = _drain_redirects(queue)
             if redirects:
@@ -515,6 +546,11 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 stopped = True
                 await websocket.send_text(json.dumps({"type": "stopped"}))
                 break
+
+        # ── Recherches web (résultats réinjectés au modèle) ────────────────
+        if not stopped:
+            for q in searches:
+                results.append(await _run_search(q, websocket))
 
         # ── Appels d'outils MCP (après les commandes shell) ────────────────
         if not stopped:

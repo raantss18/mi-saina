@@ -233,6 +233,16 @@ def _build_tools_block() -> str:
             "[MCP: fetch.fetch {\"url\": \"https://…\"}] (ajoute https:// si absent), "
             "PUIS rédige un résumé. N'utilise [SEARCH: …] que pour une recherche "
             "générale sans site précis.")
+        lines.append(
+            "POUR TÉLÉCHARGER DES FICHIERS depuis un site (ex. « télécharge les "
+            "sujets de bac 2026 sur apmep ») : procède en plusieurs étapes — "
+            "(1) [MCP: fetch.fetch {\"url\": \"https://…\"}] pour ouvrir la page "
+            "pertinente et LIRE les liens (suis les liens de section si besoin, une "
+            "page à la fois) ; (2) repère les URLs des fichiers (.pdf, .zip…) dans le "
+            "contenu récupéré ; (3) crée un dossier puis télécharge chaque fichier "
+            "avec le shell : [EXEC: mkdir -p ~/Téléchargements/<sujet> && wget -q -P "
+            "~/Téléchargements/<sujet> \"<url-du-fichier>\"]. Utilise les URLs EXACTES "
+            "vues dans la page, n'invente jamais de lien.")
     return "\n".join(lines)
 
 
