@@ -36,7 +36,27 @@
 
 ---
 
-## 🚀 Installation rapide (recommandée)
+## 🚀 Installation
+
+Deux méthodes au choix.
+
+### Option A — Installeur `.run` (le plus simple) ⭐
+
+Pour les utilisateurs : un seul fichier, aucune compilation.
+
+```bash
+# Télécharge mi-saina-X.Y.Z-x86_64.run depuis la page Releases, puis :
+chmod +x mi-saina-*-x86_64.run
+./mi-saina-*-x86_64.run        # NE PAS lancer avec sudo
+```
+
+L'installeur s'occupe de tout : installe **Ollama**, te propose un **modèle adapté à ton matériel** et le télécharge, installe mi-saina dans **`/opt/mi-saina`**, et ajoute l'appli au **menu Applications** + au **démarrage de session** (icône dans la barre système). La fenêtre desktop **démarre le backend toute seule** — rien d'autre à lancer. Linux x86_64.
+
+> 📥 Page des releases : **https://github.com/raantss18/mi-saina/releases**
+> Mise à jour : depuis l'appli, **Config → Réglages → Mettre à jour** (ou relance un `.run` plus récent).
+> Désinstaller : `sudo /opt/mi-saina/uninstall.sh`.
+
+### Option B — Depuis les sources (développeurs)
 
 Une seule commande, quelle que soit ta distribution :
 

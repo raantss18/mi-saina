@@ -43,11 +43,44 @@ export default function ConfigPanel() {
   const [desktop, setDesktop] = useState(false);
   const [autostart, setAutostartState] = useState(false);
 
+  // Mise à jour du logiciel
+  const [upd, setUpd] = useState<{ current?: string; latest?: string | null; update_available?: boolean; install_type?: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updLog, setUpdLog] = useState<string[]>([]);
+
+  const checkUpdate = async () => {
+    setChecking(true);
+    try {
+      const r = await fetch(`${API_BASE}/update/check`);
+      setUpd(await r.json());
+    } catch { /* backend indisponible */ }
+    setChecking(false);
+  };
+
+  const applyUpdate = () => {
+    setUpdating(true);
+    setUpdLog([]);
+    try {
+      const es = new EventSource(`${API_BASE}/update/apply`);
+      es.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.done) { es.close(); setUpdating(false); checkUpdate(); return; }
+          if (d.log) setUpdLog(l => [...l, d.log]);
+        } catch {}
+      };
+      es.onerror = () => { es.close(); setUpdating(false); }; // un redémarrage des services coupe le flux : normal
+    } catch { setUpdating(false); }
+  };
+
   useEffect(() => {
     if (!isTauri()) return;
     setDesktop(true);
     isAutostartEnabled().then(setAutostartState);
   }, []);
+
+  useEffect(() => { checkUpdate(); }, []);
 
   const toggleAutostart = async (on: boolean) => {
     setAutostartState(on);
@@ -332,6 +365,50 @@ export default function ConfigPanel() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
             Appliqués immédiatement et persistés (<code>~/.config/mi-saina/settings.json</code>), sans redémarrage.
+          </div>
+
+          {/* Mise à jour du logiciel */}
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 8,
+            padding: "10px 12px", background: "var(--bg)",
+            border: "1px solid var(--border)", borderRadius: 8,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", flex: 1 }}>
+                mi-saina {upd?.current ? `v${upd.current}` : ""}
+              </span>
+              {upd?.update_available
+                ? <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-contrast)", background: "var(--accent)", borderRadius: 12, padding: "2px 8px" }}>maj v{upd.latest} dispo</span>
+                : upd?.latest
+                  ? <span style={{ fontSize: 10, color: "var(--green)" }}>✓ à jour</span>
+                  : <span style={{ fontSize: 10, color: "var(--text-muted)" }}>version en ligne inconnue</span>}
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              Source : {upd?.install_type === "run" ? "installeur .run (/opt)" : upd?.install_type === "source" ? "code source (git)" : "—"}.
+              {" "}La mise à jour est appliquée automatiquement.
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={checkUpdate} disabled={checking || updating}
+                style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+                {checking ? "Vérification…" : "↻ Vérifier"}
+              </button>
+              <button onClick={applyUpdate} disabled={updating || !upd?.update_available}
+                title={upd?.update_available ? "Télécharger et installer la mise à jour" : "Aucune mise à jour disponible"}
+                style={{
+                  background: upd?.update_available && !updating ? "var(--accent)" : "var(--border)",
+                  border: "none", color: upd?.update_available && !updating ? "var(--accent-contrast)" : "var(--text-muted)",
+                  padding: "6px 14px", borderRadius: 4, cursor: upd?.update_available ? "pointer" : "default", fontSize: 11, fontWeight: 700,
+                }}>
+                {updating ? "Mise à jour…" : "⬆ Mettre à jour"}
+              </button>
+            </div>
+            {updLog.length > 0 && (
+              <pre style={{
+                margin: 0, maxHeight: 160, overflowY: "auto", background: "var(--surface)",
+                border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px",
+                fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>{updLog.join("\n")}</pre>
+            )}
           </div>
 
           {desktop && (

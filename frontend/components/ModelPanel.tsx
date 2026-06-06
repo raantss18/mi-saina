@@ -41,7 +41,7 @@ export default function ModelPanel({ onModelChange }: Props) {
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [pullInput, setPullInput] = useState("");
   const [actionModel, setActionModel] = useState<string | null>(null);  // modèle en cours d'action
-  const [actionType, setActionType] = useState<"pull" | "update" | "delete" | null>(null);
+  const [actionType, setActionType] = useState<"pull" | "update" | "delete" | "import" | null>(null);
   const [pullStatus, setPullStatus] = useState<PullStatus | null>(null);
   const [error, setError] = useState("");
 
@@ -124,6 +124,36 @@ export default function ModelPanel({ onModelChange }: Props) {
     }
   };
 
+  const importLmStudio = () => {
+    setActionModel("LM Studio");
+    setActionType("import");
+    setError("");
+    setPullStatus({ status: "Recherche des modèles LM Studio…" });
+    try {
+      const es = new EventSource(`${API_BASE}/models/import-lmstudio`);
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.status === "done") {
+            es.close();
+            setActionModel(null); setActionType(null); setPullStatus(null);
+            fetchModels();
+            return;
+          }
+          setPullStatus({ status: data.status || "" });
+        } catch {}
+      };
+      es.onerror = () => {
+        es.close();
+        setActionModel(null); setActionType(null); setPullStatus(null);
+        fetchModels();
+      };
+    } catch {
+      setActionModel(null); setActionType(null);
+      setError("Import LM Studio impossible");
+    }
+  };
+
   const busy = actionModel !== null;
 
   return (
@@ -139,7 +169,7 @@ export default function ModelPanel({ onModelChange }: Props) {
       {pullStatus && (
         <div style={{ background: "var(--bg)", border: "1px solid var(--accent)", borderRadius: 6, padding: "8px 12px" }}>
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-            {actionType === "update" ? "↻ Mise à jour" : "↓ Téléchargement"} : <code style={{ color: "var(--accent)" }}>{actionModel}</code>
+            {actionType === "update" ? "↻ Mise à jour" : actionType === "import" ? "⇪ Import LM Studio" : "↓ Téléchargement"} : <code style={{ color: "var(--accent)" }}>{actionModel}</code>
           </div>
           <div style={{ fontSize: 11, color: "var(--text)" }}>
             {pullStatus.status}{pullStatus.percent !== undefined && ` — ${pullStatus.percent}%`}
@@ -248,6 +278,20 @@ export default function ModelPanel({ onModelChange }: Props) {
           </button>
         </div>
         {error && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 6 }}>{error}</div>}
+
+        {/* Import depuis LM Studio */}
+        <button
+          onClick={importLmStudio}
+          disabled={busy}
+          title="Importer dans Ollama tous les modèles GGUF présents dans LM Studio (~/.lmstudio/models)"
+          style={{
+            marginTop: 8, width: "100%", background: "var(--bg)", border: "1px dashed var(--accent)",
+            color: "var(--accent)", padding: "7px", borderRadius: 6, cursor: busy ? "default" : "pointer",
+            fontSize: 11, fontWeight: 600,
+          }}
+        >
+          ⇪ Importer mes modèles LM Studio
+        </button>
       </div>
 
       <div style={{ fontSize: 10, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 8 }}>

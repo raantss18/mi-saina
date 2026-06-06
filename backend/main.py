@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import (chat, shell, search, memory as memory_router,
-                     models as models_router, config_router, schedule)
+                     models as models_router, config_router, schedule, update)
 from services.scheduler import scheduler_loop
 
 app = FastAPI(title="mi-saina API", version="1.0.0")
@@ -28,6 +28,7 @@ app.include_router(memory_router.router, prefix="/memory")
 app.include_router(models_router.router, prefix="/models")
 app.include_router(config_router.router, prefix="/config")
 app.include_router(schedule.router, prefix="/schedule")
+app.include_router(update.router, prefix="/update")
 
 
 @app.get("/health")

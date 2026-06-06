@@ -43,3 +43,6 @@ Thumbs.db
 
 # Notes de travail locales (non publiées)
 TODO.md
+
+# Artefacts d'installeur (.run) — publiés dans les releases GitHub, pas dans git
+dist/

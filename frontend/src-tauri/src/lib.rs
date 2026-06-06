@@ -42,25 +42,37 @@ mod backend {
         TcpStream::connect_timeout(&addr, Duration::from_millis(400)).is_ok()
     }
 
-    // <repo>/backend, déduit du chemin de l'exécutable
-    // (<repo>/frontend/src-tauri/target/{debug,release}/mi-saina).
+    // Trouve le dossier backend selon le mode d'installation :
+    // - /opt : <prefix>/bin/mi-saina  -> <prefix>/backend
+    // - dev  : <repo>/frontend/src-tauri/target/{debug,release}/mi-saina -> <repo>/backend
     fn backend_dir() -> Option<PathBuf> {
         let exe = std::env::current_exe().ok()?;
-        let repo = exe.parent()?.parent()?.parent()?.parent()?.parent()?;
-        let dir = repo.join("backend");
-        if dir.join("main.py").exists() {
-            Some(dir)
-        } else {
-            None
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(prefix) = exe.parent().and_then(|b| b.parent()) {
+            candidates.push(prefix.join("backend")); // install /opt
         }
+        if let Some(repo) = exe.ancestors().nth(5) {
+            candidates.push(repo.join("backend")); // dépôt source
+        }
+        candidates.into_iter().find(|d| d.join("main.py").exists())
     }
 
     fn find_uvicorn() -> Option<PathBuf> {
-        let home = std::env::var_os("HOME")?;
-        for venv in ["mi-saina-env", "localmind-env"] {
-            let p = PathBuf::from(&home).join(venv).join("bin").join("uvicorn");
-            if p.exists() {
-                return Some(p);
+        // venv embarqué d'une install /opt (<prefix>/venv), à côté de bin/.
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(prefix) = exe.parent().and_then(|b| b.parent()) {
+                let p = prefix.join("venv").join("bin").join("uvicorn");
+                if p.exists() {
+                    return Some(p);
+                }
+            }
+        }
+        if let Some(home) = std::env::var_os("HOME") {
+            for venv in ["mi-saina-env", "localmind-env"] {
+                let p = PathBuf::from(&home).join(venv).join("bin").join("uvicorn");
+                if p.exists() {
+                    return Some(p);
+                }
             }
         }
         None
