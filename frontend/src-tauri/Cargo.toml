@@ -24,3 +24,7 @@ serde_json = "1"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
+
+# Linux : lier le cycle de vie du backend enfant à celui de l'appli (PR_SET_PDEATHSIG).
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"

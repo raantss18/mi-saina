@@ -70,13 +70,26 @@ mod backend {
     pub fn spawn(port: u16) -> Option<Child> {
         let dir = backend_dir()?;
         let uvicorn = find_uvicorn()?;
-        Command::new(uvicorn)
-            .args(["main:app", "--host", "127.0.0.1", "--port", &port.to_string()])
+        let mut cmd = Command::new(uvicorn);
+        cmd.args(["main:app", "--host", "127.0.0.1", "--port", &port.to_string()])
             .current_dir(dir)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .ok()
+            .stderr(Stdio::null());
+
+        // Linux : si l'appli meurt (même par SIGTERM/SIGKILL, ex. fin de session),
+        // le noyau envoie SIGTERM au backend → pas d'orphelin sur le port 8000.
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::process::CommandExt;
+            unsafe {
+                cmd.pre_exec(|| {
+                    libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+                    Ok(())
+                });
+            }
+        }
+
+        cmd.spawn().ok()
     }
 }
 
