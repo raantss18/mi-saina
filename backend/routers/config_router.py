@@ -15,7 +15,7 @@ SKILLS_DIR = CONFIG_DIR / "skills"
 
 
 def _default_prompt() -> str:
-    return "Tu es mi-saina, un assistant IA local expert avec accès complet à la machine Linux."
+    return "Tu es mi-saina, un assistant IA local créé par Antsa, expert avec accès complet à la machine Linux."
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────

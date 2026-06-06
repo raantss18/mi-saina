@@ -1,30 +1,111 @@
 @import "tailwindcss";
 
+/* ───────────────────────── Thème (sombre par défaut) ─────────────────────────
+   Variables réutilisées partout (les styles inline existants continuent de
+   marcher). Thème clair via [data-theme="light"], auto via prefers-color-scheme
+   quand data-theme vaut "auto" ou est absent. */
 :root {
   --bg: #0d1117;
   --surface: #161b22;
-  --border: #30363d;
+  --surface-2: #1c2230;
+  --border: #2a3140;
+  --border-strong: #3a4252;
   --text: #e6edf3;
-  --text-muted: #8b949e;
+  --text-muted: #9aa4b2;
   --accent: #58a6ff;
+  --accent-contrast: #06223f;
   --green: #3fb950;
   --red: #f85149;
   --yellow: #d29922;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --radius: 10px;
+  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-* {
-  box-sizing: border-box;
+/* Thème clair explicite */
+[data-theme="light"] {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #f0f3f7;
+  --border: #d8dee4;
+  --border-strong: #c2cad4;
+  --text: #1f2329;
+  --text-muted: #5b6573;
+  --accent: #1f6feb;
+  --accent-contrast: #ffffff;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --yellow: #9a6700;
+  --shadow: 0 8px 30px rgba(140, 149, 159, 0.25);
 }
+
+/* Auto : suit le système quand aucun thème explicite n'est forcé */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6f8fa;
+    --surface: #ffffff;
+    --surface-2: #f0f3f7;
+    --border: #d8dee4;
+    --border-strong: #c2cad4;
+    --text: #1f2329;
+    --text-muted: #5b6573;
+    --accent: #1f6feb;
+    --accent-contrast: #ffffff;
+    --green: #1a7f37;
+    --red: #cf222e;
+    --yellow: #9a6700;
+    --shadow: 0 8px 30px rgba(140, 149, 159, 0.25);
+  }
+}
+/* Si l'utilisateur force un thème, on neutralise l'auto ci-dessus */
+[data-theme="dark"] { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-ui);
   margin: 0;
   height: 100vh;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+code, pre, kbd { font-family: var(--font-mono); }
+
+/* Barre de défilement fine et discrète */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Raccourci visuel clavier (kbd) */
+kbd {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Animations utilitaires */
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+
+.ms-fade { animation: fadeIn 0.18s ease both; }
+.ms-pop { animation: pop 0.14s ease both; }
+
+/* Focus visible cohérent */
+button, input, textarea, select { font-family: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 6px; }

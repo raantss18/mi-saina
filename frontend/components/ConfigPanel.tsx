@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
+import { isTauri, isAutostartEnabled, setAutostart } from "../lib/desktop";
 
 interface Skill {
   name: string;
@@ -30,6 +31,21 @@ export default function ConfigPanel() {
   // Skill editor
   const [editSkill, setEditSkill] = useState<Skill | null>(null);
   const [newSkill, setNewSkill] = useState(false);
+
+  // Intégrations desktop (Tauri) : lancement au démarrage
+  const [desktop, setDesktop] = useState(false);
+  const [autostart, setAutostartState] = useState(false);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    setDesktop(true);
+    isAutostartEnabled().then(setAutostartState);
+  }, []);
+
+  const toggleAutostart = async (on: boolean) => {
+    setAutostartState(on);
+    await setAutostart(on);
+  };
 
   const emptySkill = (): Skill => ({ name: "", trigger: "/", description: "", icon: "⚡", prompt: "" });
 
@@ -308,6 +324,24 @@ export default function ConfigPanel() {
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
             Appliqués immédiatement et persistés (<code>~/.config/mi-saina/settings.json</code>), sans redémarrage.
           </div>
+
+          {desktop && (
+            <div style={{
+              display: "flex", flexDirection: "column", gap: 4,
+              padding: "8px 10px", background: "var(--bg)",
+              border: "1px solid var(--accent)", borderRadius: 6,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 11, color: "var(--text)", fontWeight: 700, flex: 1 }}>Lancer au démarrage de la session</label>
+                <input type="checkbox" checked={autostart}
+                  onChange={e => toggleAutostart(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: "pointer", accentColor: "var(--accent)" }} />
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.4 }}>
+                Démarre mi-saina automatiquement (réduit dans la barre système) à l&apos;ouverture de session.
+              </div>
+            </div>
+          )}
 
           {Object.keys(setSchema).length === 0 && (
             <div style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: 11 }}>Chargement…</div>

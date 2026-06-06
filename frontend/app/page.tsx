@@ -8,7 +8,11 @@ import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
 import TerminalPanel, { TaskStatus } from "../components/TerminalPanel";
 import SchedulePanel from "../components/SchedulePanel";
+import ThemeToggle from "../components/ThemeToggle";
+import CommandPalette, { Command } from "../components/CommandPalette";
+import WelcomeScreen from "../components/WelcomeScreen";
 import { API_BASE, WS_BASE } from "../lib/config";
+import { notify } from "../lib/desktop";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -67,6 +71,8 @@ export default function Home() {
   const [skillIndex, setSkillIndex] = useState(0);   // item surligné dans l'autocomplétion
   const [lastUserMsg, setLastUserMsg] = useState("");
   const [memoryRefresh, setMemoryRefresh] = useState(0);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -101,7 +107,12 @@ export default function Home() {
       if (data.type === "done") {
         setActiveModel(data.model || "");
         setStreaming(false);
-        setTaskStatus(turnFailureRef.current ? "failure" : "success");
+        const failed = turnFailureRef.current;
+        setTaskStatus(failed ? "failure" : "success");
+        // Notification système (desktop) si la fenêtre n'est pas au premier plan
+        if (typeof document !== "undefined" && !document.hasFocus()) {
+          notify("mi-saina", failed ? "✗ Tâche terminée avec des erreurs" : "✓ Tâche terminée");
+        }
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant")
@@ -271,6 +282,39 @@ export default function Home() {
   }, []);
 
   useEffect(() => { connect(); return () => wsRef.current?.close(); }, [connect]);
+
+  // Raccourcis globaux : Ctrl/⌘+K (palette), Ctrl/⌘+B (barre latérale)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(o => !o);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Restaure la préférence de barre latérale (repliée/dépliée)
+  useEffect(() => {
+    try { if (localStorage.getItem("ms-sidebar") === "0") setSidebarOpen(false); } catch { /* stockage indispo */ }
+  }, []);
+
+  const toggleSidebar = () => setSidebarOpen(o => {
+    const next = !o;
+    try { localStorage.setItem("ms-sidebar", next ? "1" : "0"); } catch { /* stockage indispo */ }
+    return next;
+  });
+
+  // Insère un exemple/prompt dans la saisie (l'utilisateur peut le compléter avant d'envoyer)
+  const pickExample = (text: string) => {
+    setInput(text);
+    setSkillMenu(false);
+    inputRef.current?.focus();
+  };
 
   const sendShellInput = (text: string) => {
     wsRef.current?.send(JSON.stringify({ type: "shell_stdin", text }));
@@ -446,6 +490,24 @@ export default function Home() {
     skillFilter === "" || s.trigger.toLowerCase().includes(skillFilter) || s.name.toLowerCase().includes(skillFilter)
   );
 
+  // Actions de la palette ⌘K
+  const paletteCommands: Command[] = [
+    { id: "go-chat", icon: "💬", label: "Aller au chat", keywords: "retour chat", run: () => setPanel(null) },
+    { id: "new-chat", icon: "✏", label: "Nouvelle conversation", run: () => { setPanel(null); clearChat(); } },
+    { id: "rerun", icon: "↺", label: "Relancer le dernier prompt", run: rerunLast },
+    { id: "copy", icon: "⎘", label: "Copier la dernière réponse", run: copyLastResponse },
+    { id: "stop", icon: "⏹", label: "Arrêter la génération", run: stopGeneration },
+    { id: "terminal", icon: "▣", label: "Afficher/masquer le terminal", run: () => setShowTerminal(v => !v) },
+    { id: "sidebar", icon: "☰", label: "Replier/déplier la barre latérale", hint: "Ctrl/⌘ B", run: toggleSidebar },
+    { id: "panel-models", icon: "⬡", label: "Ouvrir : Modèles", keywords: "modele model", run: () => setPanel("models") },
+    { id: "panel-config", icon: "⚙", label: "Ouvrir : Config", keywords: "reglages settings", run: () => setPanel("config") },
+    { id: "panel-schedule", icon: "⏰", label: "Ouvrir : Tâches planifiées", keywords: "schedule cron", run: () => setPanel("schedule") },
+    ...skills.map((s): Command => ({
+      id: `skill-${s.name}`, icon: s.icon || "▸", label: `Skill : ${s.trigger}`,
+      hint: s.description, keywords: s.name, run: () => applySkill(s),
+    })),
+  ];
+
   const btnStyle = (active = false, danger = false): React.CSSProperties => ({
     background: active ? "var(--accent)" : danger ? "rgba(248,81,73,0.15)" : "var(--border)",
     border: danger ? "1px solid var(--red)" : "none",
@@ -456,12 +518,16 @@ export default function Home() {
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "var(--bg)" }}>
-      <MemoryPanel
-        activeSessionId={sessionId}
-        onSelectSession={(id) => { loadSession(id); }}
-        onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); }}
-        refreshKey={memoryRefresh}
-      />
+      {sidebarOpen && (
+        <MemoryPanel
+          activeSessionId={sessionId}
+          onSelectSession={(id) => { loadSession(id); setPanel(null); }}
+          onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); }}
+          refreshKey={memoryRefresh}
+          activePanel={panel}
+          onNavigate={setPanel}
+        />
+      )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Header */}
@@ -470,6 +536,12 @@ export default function Home() {
           display: "flex", alignItems: "center", gap: 8,
           background: "var(--surface)", flexShrink: 0,
         }}>
+          <button onClick={toggleSidebar}
+            title={`${sidebarOpen ? "Replier" : "Déplier"} la barre latérale (Ctrl/⌘ + B)`}
+            aria-label="Basculer la barre latérale"
+            style={{ ...btnStyle(), padding: "4px 8px", fontSize: 14 }}>
+            ☰
+          </button>
           <span style={{ color: "var(--text-muted)", fontSize: 10 }}>modèle:</span>
           <span style={{ background: "var(--border)", padding: "2px 8px", borderRadius: 12, fontSize: 11, color: "var(--accent)" }}>
             {activeModel}
@@ -490,18 +562,13 @@ export default function Home() {
               🗑
             </button>
             <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
-            <button onClick={() => setPanel(p => p === "config" ? null : "config")} style={btnStyle(panel === "config")}>
-              ⚙ Config
-            </button>
-            <button onClick={() => setPanel(p => p === "models" ? null : "models")} style={btnStyle(panel === "models")}>
-              ⬡ Modèles
-            </button>
-            <button onClick={() => setPanel(p => p === "schedule" ? null : "schedule")} style={btnStyle(panel === "schedule")}>
-              ⏰ Tâches
-            </button>
             <button onClick={() => setShowTerminal(v => !v)} title="Afficher/masquer la sortie du terminal" style={btnStyle(showTerminal)}>
               ▣ Terminal
             </button>
+            <button onClick={() => setPaletteOpen(true)} title="Palette de commandes (Ctrl/⌘ + K)" style={btnStyle()}>
+              ⌘K
+            </button>
+            <ThemeToggle />
             {/* Statut de la tâche (lu depuis les codes de retour) */}
             {taskStatus !== "idle" && (
               <span style={{
@@ -519,14 +586,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Panels */}
-        {panel && (
-          <div style={{ padding: "14px 20px", flexShrink: 0, borderBottom: "1px solid var(--border)", background: "var(--surface)", overflowY: "auto", maxHeight: "50vh" }}>
+        {/* Zone centrale : panneau plein écran OU chat */}
+        {panel ? (
+          <div style={{ flex: 1, minHeight: 0, padding: "16px 22px", overflowY: "auto", background: "var(--bg)" }}>
             {panel === "models" && <ModelPanel onModelChange={(m) => { setActiveModel(m); setPanel(null); }} />}
             {panel === "config" && <ConfigPanel />}
             {panel === "schedule" && <SchedulePanel onOpenSession={(id) => { loadSession(id); setPanel(null); }} />}
           </div>
-        )}
+        ) : (
+          <>
 
         {/* Vigilance : diagnostic détecté dans la sortie du terminal */}
         {diagnostic && (
@@ -590,7 +658,9 @@ export default function Home() {
         {/* Chat + Terminal (panneau optionnel à côté) */}
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-            <ChatWindow messages={messages} onShellInput={sendShellInput} />
+            {messages.length === 0
+              ? <WelcomeScreen onPick={pickExample} />
+              : <ChatWindow messages={messages} onShellInput={sendShellInput} />}
           </div>
           {showTerminal && (
             <TerminalPanel
@@ -735,6 +805,8 @@ export default function Home() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
 
       {/* Sudo modal */}
@@ -821,6 +893,8 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <CommandPalette open={paletteOpen} commands={paletteCommands} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

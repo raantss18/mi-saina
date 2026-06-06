@@ -7,30 +7,36 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "MS_DESKTOP=1 tauri build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "next": "16.2.7",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/cli": "^2.11.2",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "jsdom": "^25.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^2.0.0",
-    "@vitejs/plugin-react": "^4.0.0",
-    "@testing-library/react": "^16.0.0",
-    "@testing-library/jest-dom": "^6.0.0",
-    "@testing-library/user-event": "^14.0.0",
-    "jsdom": "^25.0.0",
-    "@vitest/coverage-v8": "^2.0.0"
+    "vitest": "^2.0.0"
   }
 }

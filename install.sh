@@ -30,7 +30,7 @@ ID=""; ID_LIKE=""
 [ -r /etc/os-release ] && . /etc/os-release
 DISTRO_IDS="${ID:-} ${ID_LIKE:-}"
 
-PKG_FAMILY="unknown"; INSTALL_CMD=""; DEV_PKGS=""
+PKG_FAMILY="unknown"; INSTALL_CMD=""; DEV_PKGS=""; DESKTOP_PKGS=""
 have() { command -v "$1" &>/dev/null; }
 # Pas de sudo si déjà root (utile en conteneur / CI)
 SUDO="sudo"; [ "$(id -u)" -eq 0 ] && SUDO=""
@@ -55,31 +55,107 @@ pick_port() {
     echo "$1"   # rien de libre trouvé → on garde le préféré
 }
 
+# ── Fenêtre desktop (Tauri) : compile l'appli native + l'ajoute au menu
+#    Applications et au démarrage de session (icône dans la barre système).
+#    Tout est best-effort : en cas d'échec, l'appli web reste utilisable.
+#    Désactivable avec MISAINA_NO_DESKTOP=1.
+install_desktop() {
+    [ -n "${MISAINA_NO_DESKTOP:-}" ] && { info "Fenêtre desktop ignorée (MISAINA_NO_DESKTOP=1)."; return 0; }
+
+    info "Préparation de la fenêtre desktop (Tauri)…"
+    # Dépendances de build (webkit, tray, rust) — best effort.
+    if [ "$PKG_FAMILY" != "unknown" ] && [ -n "$DESKTOP_PKGS" ]; then
+        # shellcheck disable=SC2086
+        $INSTALL_CMD $DESKTOP_PKGS || warn "Dépendances desktop partiellement installées — le build peut échouer."
+    fi
+    if ! have cargo; then
+        warn "Rust/cargo introuvable → fenêtre desktop non compilée (l'appli web reste sur http://localhost:$FRONTEND_PORT)."
+        warn "Pour l'activer plus tard : installe rust + webkit2gtk, puis relance : bash install.sh"
+        return 0
+    fi
+
+    # 1) Export statique du frontend (embarqué dans le binaire ; pointe vers le backend détecté).
+    info "Build du frontend desktop (export statique)…"
+    ( cd "$INSTALL_DIR/frontend" && MS_DESKTOP=1 NEXT_PUBLIC_API_BASE="$API_BASE_URL" npm run build ) \
+        || { warn "Build frontend desktop échoué — fenêtre non installée."; return 0; }
+
+    # 2) Compilation du binaire natif (long au 1er build).
+    info "Compilation de la fenêtre native (Rust — plusieurs minutes au 1er build)…"
+    ( cd "$INSTALL_DIR/frontend/src-tauri" && cargo build --release ) \
+        || { warn "Compilation desktop échouée — fenêtre non installée."; return 0; }
+
+    local BIN="$INSTALL_DIR/frontend/src-tauri/target/release/mi-saina"
+    [ -x "$BIN" ] || { warn "Binaire desktop introuvable après build."; return 0; }
+
+    # 3) Icône.
+    mkdir -p "$HOME/.local/share/icons/hicolor/128x128/apps"
+    cp "$INSTALL_DIR/frontend/src-tauri/icons/128x128.png" \
+       "$HOME/.local/share/icons/hicolor/128x128/apps/mi-saina.png" 2>/dev/null || true
+
+    # 4) Lanceur dans le menu Applications.
+    mkdir -p "$HOME/.local/share/applications"
+    cat > "$HOME/.local/share/applications/mi-saina.desktop" <<DESKEOF
+[Desktop Entry]
+Type=Application
+Name=mi-saina
+Comment=Assistant IA local créé par Antsa
+Exec=$BIN
+Icon=mi-saina
+Terminal=false
+Categories=Utility;
+Keywords=IA;assistant;ollama;mi-saina;
+StartupNotify=true
+DESKEOF
+
+    # 5) Démarrage automatique dans la barre système (fenêtre masquée) à l'ouverture de session.
+    mkdir -p "$HOME/.config/autostart"
+    cat > "$HOME/.config/autostart/mi-saina.desktop" <<AUTOEOF
+[Desktop Entry]
+Type=Application
+Name=mi-saina (barre système)
+Comment=Démarre mi-saina dans la barre système
+Exec=$BIN --minimized
+Icon=mi-saina
+Terminal=false
+X-GNOME-Autostart-enabled=true
+AUTOEOF
+
+    command -v update-desktop-database &>/dev/null && \
+        update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+    ok "Fenêtre desktop installée : menu Applications + barre système au démarrage (clic = ouvre la fenêtre native)."
+}
+
 if echo "$DISTRO_IDS" | grep -qiE 'arch'; then
     PKG_FAMILY="arch"
     INSTALL_CMD="$SUDO pacman -S --needed --noconfirm"
     DEV_PKGS="python python-pip nodejs npm git curl base-devel"
+    DESKTOP_PKGS="webkit2gtk-4.1 libappindicator-gtk3 librsvg rust"
 elif echo "$DISTRO_IDS" | grep -qiE 'debian|ubuntu'; then
     PKG_FAMILY="debian"
     INSTALL_CMD="$SUDO apt-get install -y"
     DEV_PKGS="python3 python3-pip python3-venv nodejs npm git curl build-essential"
+    DESKTOP_PKGS="libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev cargo"
     $SUDO apt-get update -y || true
 elif echo "$DISTRO_IDS" | grep -qiE 'fedora|rhel|centos'; then
     PKG_FAMILY="fedora"
     INSTALL_CMD="$SUDO dnf install -y"
     DEV_PKGS="python3 python3-pip nodejs npm git curl @development-tools"
+    DESKTOP_PKGS="webkit2gtk4.1-devel libappindicator-gtk3-devel librsvg2-devel openssl-devel cargo"
 elif echo "$DISTRO_IDS" | grep -qiE 'suse'; then
     PKG_FAMILY="suse"
     INSTALL_CMD="$SUDO zypper install -y"
     DEV_PKGS="python3 python3-pip nodejs npm git curl gcc gcc-c++ make"
+    DESKTOP_PKGS="webkit2gtk3-devel libappindicator3-1 librsvg-devel libopenssl-devel cargo"
 elif have xbps-install; then
     PKG_FAMILY="void"
     INSTALL_CMD="$SUDO xbps-install -Sy"
     DEV_PKGS="python3 python3-pip nodejs git curl base-devel"
+    DESKTOP_PKGS="webkit2gtk-devel libappindicator-devel librsvg-devel rust cargo"
 elif have apk; then
     PKG_FAMILY="alpine"
     INSTALL_CMD="$SUDO apk add"
     DEV_PKGS="python3 py3-pip nodejs npm git curl build-base"
+    DESKTOP_PKGS="webkit2gtk-dev libappindicator-dev librsvg-dev rust cargo"
 else
     warn "Distribution non reconnue — installe manuellement : python3, nodejs, npm, git, curl"
 fi
@@ -256,6 +332,9 @@ else
     warn "Backend pas encore prêt — voir : journalctl --user -u mi-saina-backend -n 50"
 fi
 
+# ── 10. Fenêtre desktop (menu Applications + barre système) ────────
+install_desktop
+
 echo ""
 echo -e "${G}╔══════════════════════════════════════════╗${NC}"
 echo -e "${G}║        ✅ Installation terminée !         ║${NC}"
@@ -264,6 +343,11 @@ echo -e "${G}  Interface → http://localhost:$FRONTEND_PORT"
 echo -e "${G}  API       → http://localhost:$BACKEND_PORT"
 echo -e "${G}  Modèle    → $MODEL${NC}"
 echo -e "${G}╚══════════════════════════════════════════╝${NC}"
+echo ""
+echo "Application :"
+echo "  • Fenêtre desktop : cherche « mi-saina » dans ton menu d'applications."
+echo "  • Au prochain démarrage de session, l'icône apparaît dans la barre système (clic = ouvre la fenêtre)."
+echo "  • Version web (au besoin) : http://localhost:$FRONTEND_PORT"
 echo ""
 echo "Commandes utiles :"
 echo "  systemctl --user status mi-saina-backend"

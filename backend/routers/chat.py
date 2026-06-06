@@ -27,7 +27,7 @@ REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 
-_DEFAULT_SYSTEM = "Tu es mi-saina, un assistant IA local expert avec accès complet à la machine Linux."
+_DEFAULT_SYSTEM = "Tu es mi-saina, un assistant IA local créé par Antsa, expert avec accès complet à la machine Linux."
 
 
 def _load_system_prompt() -> str:

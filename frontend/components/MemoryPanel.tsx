@@ -22,14 +22,25 @@ interface HistResult {
   snippet: string;
 }
 
+type NavPanel = "models" | "config" | "schedule" | null;
+
 interface Props {
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
   onNewSession: (id: string) => void;
   refreshKey?: number;
+  activePanel?: NavPanel;
+  onNavigate?: (panel: NavPanel) => void;
 }
 
-export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSession, refreshKey = 0 }: Props) {
+const NAV: { id: NavPanel; icon: string; label: string }[] = [
+  { id: null, icon: "💬", label: "Chat" },
+  { id: "models", icon: "⬡", label: "Modèles" },
+  { id: "config", icon: "⚙", label: "Config" },
+  { id: "schedule", icon: "⏰", label: "Tâches" },
+];
+
+export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSession, refreshKey = 0, activePanel = null, onNavigate }: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -103,6 +114,32 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
         <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>
           mi-saina
         </div>
+
+        {/* Navigation : Chat / Modèles / Config / Tâches */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
+          {NAV.map(item => {
+            const active = activePanel === item.id;
+            return (
+              <button
+                key={item.label}
+                onClick={() => onNavigate?.(item.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  padding: "6px 8px", borderRadius: 6, cursor: "pointer", fontSize: 12,
+                  border: "1px solid transparent", textAlign: "left",
+                  background: active ? "var(--surface-2)" : "transparent",
+                  color: active ? "var(--accent)" : "var(--text-muted)",
+                  borderColor: active ? "var(--accent)" : "transparent",
+                  fontWeight: active ? 700 : 400,
+                }}
+              >
+                <span style={{ fontSize: 15, width: 18, textAlign: "center" }}>{item.icon}</span>
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
         <button
           onClick={handleNew}
           style={{

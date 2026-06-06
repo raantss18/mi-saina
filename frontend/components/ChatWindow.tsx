@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 export interface Message {
-  role: "user" | "assistant" | "shell";
+  role: "user" | "assistant" | "shell" | "plan";
   content: string;
   model?: string;
   streaming?: boolean;

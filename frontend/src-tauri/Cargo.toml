@@ -1,0 +1,26 @@
+[package]
+name = "mi-saina"
+version = "1.0.0"
+description = "mi-saina — assistant IA local"
+authors = ["mi-saina"]
+edition = "2021"
+
+[lib]
+name = "mi_saina_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Plugins desktop uniquement (raccourci global + lancement au démarrage + instance unique).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"

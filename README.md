@@ -1,6 +1,6 @@
 # mi-saina — Assistant IA local
 
-**mi-saina** est un assistant IA local inspiré de Claude Code, qui tourne **100 % sur ta machine** grâce à [Ollama](https://ollama.com). Aucune donnée n'est envoyée dans le cloud. Il a un accès complet à ton ordinateur Linux : exécution de commandes shell en temps réel, gestion de fichiers, recherche web, mémoire des conversations, et outils externes (MCP).
+**mi-saina** est un assistant IA local **créé par Antsa**, qui tourne **100 % sur ta machine** grâce à [Ollama](https://ollama.com). Aucune donnée n'est envoyée dans le cloud. Il a un accès complet à ton ordinateur Linux : exécution de commandes shell en temps réel, gestion de fichiers, recherche web, mémoire des conversations, et outils externes (MCP).
 
 > 🐧 **Fonctionne sur toutes les grandes distributions Linux** — Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine. mi-saina **détecte ta distribution** et utilise automatiquement le bon gestionnaire de paquets (`pacman`/`paru`, `apt`, `dnf`, `zypper`, `xbps`, `apk`). Pas besoin d'être sur Arch.
 
@@ -15,6 +15,7 @@
 - **Mémoire** — recherche sémantique + plein-texte de l'historique, profil utilisateur persistant, fichiers de contexte de projet.
 - **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
 - **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
+- **Fenêtre desktop native** (Tauri) — appli dans le menu Applications, **icône dans la barre système** au démarrage, raccourci global, notifications, palette de commandes ⌘K, thème clair/sombre/auto. Indépendante du navigateur et du bureau (KDE/GNOME/XFCE/Wayland).
 
 ---
 
@@ -50,10 +51,12 @@ Le script `install.sh` fait tout, dans l'ordre :
 5. **Installe le frontend** (`npm install`).
 6. **Configure les services systemd** pour un démarrage automatique au boot.
 7. **Choisit automatiquement des ports libres** si 8000 (backend) ou 3001 (frontend) sont déjà occupés.
+8. **Compile la fenêtre desktop** (si Rust + webkit sont disponibles) et l'ajoute au **menu Applications** + au **démarrage de session** (icône dans la barre système).
 
-À la fin, ouvre l'URL affichée (par défaut **http://localhost:3001**).
+À la fin : cherche **« mi-saina »** dans ton menu d'applications, ou ouvre l'URL web affichée (par défaut **http://localhost:3001**).
 
 > Tu peux forcer les ports : `BACKEND_PORT=8010 FRONTEND_PORT=3010 bash install.sh`.
+> Pour **ne pas** compiler la fenêtre desktop : `MISAINA_NO_DESKTOP=1 bash install.sh`.
 
 ---
 
@@ -162,9 +165,23 @@ bash start.sh
 
 ## 🎮 Utilisation
 
+### Fenêtre desktop (recommandé)
+
+Après `install.sh`, mi-saina est une vraie appli :
+
+- **Menu Applications** → lance **« mi-saina »** (fenêtre native, pas le navigateur).
+- **Barre système (tray)** : au démarrage de session, l'icône apparaît automatiquement. **Clic dessus → ouvre la fenêtre** ; clic droit → *Afficher* / *Quitter*.
+- **Fermer la fenêtre** la réduit dans la barre système (mi-saina reste prêt en fond). Pour quitter complètement : tray → *Quitter*.
+- **Ctrl+Alt+M** : affiche/masque la fenêtre depuis n'importe où.
+- **Ctrl/⌘+K** : palette de commandes · **Ctrl/⌘+B** : replier la barre latérale.
+- *Config → Réglages* : bouton **« Lancer au démarrage »** et bascule de thème (clair/sombre/auto).
+
+> La fenêtre desktop parle directement au backend local ; **inutile de garder un navigateur ouvert**.
+> Lancer/builder à la main : `cd frontend && npm run desktop:dev` (dev) ou `npm run desktop:build` (bundle).
+
 ### Interface web
 
-Ouvre **http://localhost:3001** (ou le port affiché au démarrage).
+Au besoin, ouvre **http://localhost:3001** (ou le port affiché au démarrage).
 
 ### Boutons principaux
 
