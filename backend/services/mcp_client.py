@@ -33,7 +33,11 @@ _PROTOCOL_VERSION = "2024-11-05"
 
 # Appel d'outil dans la réponse du modèle : [MCP: serveur.outil {"arg": "val"}]
 # Les arguments JSON sont optionnels : [MCP: serveur.outil]
-MCP_RE = re.compile(r'\[MCP:\s*([\w.-]+?)\.([\w.-]+?)\s*(\{.*?\})?\s*\]', re.DOTALL)
+# On tolère les préfixes que les modèles locaux improvisent (FETCH, TOOL, CALL…)
+# pour ne pas rater l'appel ; [EXEC:] et [SEARCH:] restent gérés à part.
+MCP_RE = re.compile(
+    r'\[(?:MCP|FETCH|TOOL|OUTIL|CALL)\s*:\s*([\w.-]+?)\.([\w.-]+?)\s*(\{.*?\})?\s*\]',
+    re.IGNORECASE | re.DOTALL)
 
 
 def load_config() -> dict:
@@ -211,12 +215,24 @@ def _build_tools_block() -> str:
         "pratique que le shell. Syntaxe : [MCP: serveur.outil {\"arg\": \"valeur\"}] "
         "(JSON facultatif).",
     ]
+    has_fetch = False
     for name, srv in _servers.items():
         for t in srv.tools:
             desc = t.get("description") or ""
             if "DEPRECATED" in desc.upper():         # on n'expose pas les outils dépréciés
                 continue
+            if t["name"] == "fetch":
+                has_fetch = True
             lines.append(f"- {name}.{t['name']} : {_short_desc(desc)}")
+
+    # Consignes d'usage ciblées (le modèle local sait mieux quoi déclencher).
+    if has_fetch:
+        lines.append(
+            "\nQUAND L'UTILISATEUR MENTIONNE UN SITE OU UNE URL (ex. « quoi de neuf "
+            "sur apmep.fr », « résume cette page … ») : récupère son contenu avec "
+            "[MCP: fetch.fetch {\"url\": \"https://…\"}] (ajoute https:// si absent), "
+            "PUIS rédige un résumé. N'utilise [SEARCH: …] que pour une recherche "
+            "générale sans site précis.")
     return "\n".join(lines)
 
 

@@ -76,6 +76,12 @@ class TestParseCalls:
     def test_none(self):
         assert mcp.parse_calls("aucun appel ici") == []
 
+    def test_tolerates_model_prefix_variants(self):
+        # les modèles locaux écrivent parfois [FETCH:…]/[TOOL:…] au lieu de [MCP:…]
+        assert mcp.parse_calls('[FETCH: fetch.fetch {"url": "https://x.fr"}]') == \
+            [("fetch", "fetch", {"url": "https://x.fr"})]
+        assert mcp.parse_calls("[TOOL: git.git_status]") == [("git", "git_status", {})]
+
 
 class TestContentToText:
     def test_text_blocks(self):
