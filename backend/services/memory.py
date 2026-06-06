@@ -23,7 +23,7 @@ async def _get_embedding_async(text: str) -> list[float] | None:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 f"{settings.OLLAMA_BASE_URL}/api/embeddings",
-                json={"model": settings.FAST_MODEL, "prompt": text},
+                json={"model": settings.EMBED_MODEL, "prompt": text},
             )
             if resp.status_code == 200:
                 return resp.json().get("embedding")

@@ -116,10 +116,13 @@ sudo apk add python3 py3-pip nodejs npm git curl build-base
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull qwen3.5:9b   # modèle d'exemple (~6.5 GB) ; choisis selon ta machine
+ollama pull qwen3.5:9b       # modèle d'exemple (~6.5 GB) ; choisis selon ta machine
+ollama pull nomic-embed-text # petit modèle d'embeddings pour la mémoire (~270 Mo)
 ```
 
 > Petite config ? Essaie `qwen2.5:3b` ou `gemma3:4b`. Grosse config ? `qwen3:14b`, `gemma3:12b`…
+>
+> 💡 Le modèle d'embeddings (`nomic-embed-text`) est **séparé** du modèle de génération, car certains modèles (ex. gemma3) ne savent pas produire d'embeddings. Tu peux donc choisir n'importe quel modèle pour discuter sans casser la mémoire sémantique.
 
 ### 3. Backend (Python)
 

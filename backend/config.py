@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     REASONING_MODEL: str = "qwen3.5:9b"
     FAST_MODEL: str = "qwen3.5:9b"
+    # Modèle DÉDIÉ aux embeddings de la mémoire sémantique. Beaucoup de modèles
+    # génératifs (ex. gemma3) ne supportent pas /api/embeddings → on garde un petit
+    # modèle d'embeddings séparé pour ne pas casser la recherche sémantique.
+    EMBED_MODEL: str = "nomic-embed-text"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     MAX_SEARCH_RESULTS: int = 5

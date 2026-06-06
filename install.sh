@@ -162,6 +162,11 @@ info "Modèle choisi : $MODEL"
 info "Téléchargement (peut prendre plusieurs minutes)…"
 ollama pull "$MODEL" || warn "Échec du téléchargement — tu pourras réessayer avec : ollama pull $MODEL"
 
+# Modèle d'embeddings dédié (mémoire sémantique) — petit, indépendant du modèle
+# génératif (certains, comme gemma3, ne savent pas faire d'embeddings).
+info "Téléchargement du modèle d'embeddings (nomic-embed-text, ~270 Mo)…"
+ollama pull nomic-embed-text || warn "Embeddings indisponibles — réessaie : ollama pull nomic-embed-text"
+
 # ── 5. Configuration .env (minimale, sans données perso) ──────────
 if [ ! -f "$INSTALL_DIR/.env" ]; then
     cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
