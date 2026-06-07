@@ -216,7 +216,12 @@ def _build_tools_block() -> str:
         "(JSON facultatif).",
     ]
     has_fetch = False
+    scoped: list[tuple[str, list[str]]] = []   # serveurs limités à des dossiers
     for name, srv in _servers.items():
+        roots = [a for a in srv.args if a.startswith("/") or a.startswith("~")]
+        is_fs = any(t["name"] in ("list_directory", "read_file", "directory_tree") for t in srv.tools)
+        if is_fs and roots:
+            scoped.append((name, roots))
         for t in srv.tools:
             desc = t.get("description") or ""
             if "DEPRECATED" in desc.upper():         # on n'expose pas les outils dépréciés
@@ -224,6 +229,17 @@ def _build_tools_block() -> str:
             if t["name"] == "fetch":
                 has_fetch = True
             lines.append(f"- {name}.{t['name']} : {_short_desc(desc)}")
+
+    # Périmètre des serveurs de fichiers : le modèle DOIT savoir qu'ils sont
+    # limités à certains dossiers, et utiliser le SHELL (accès complet) ailleurs.
+    if scoped:
+        scope_txt = " ; ".join(f"'{n}' → {', '.join(r)}" for n, r in scoped)
+        lines.append(
+            f"\nPÉRIMÈTRE FICHIERS : les serveurs MCP de fichiers sont LIMITÉS à : {scope_txt}. "
+            "Pour tout ce qui est HORS de ces dossiers — explorer/lister/analyser le home (~/), "
+            "trouver des fichiers inutiles ou redondants, df, du, ls, find sur le système — "
+            "utilise TOUJOURS le SHELL [EXEC: …] qui a un accès COMPLET, et NON les outils MCP "
+            "de fichiers. N'utilise filesystem.* que pour les dossiers autorisés ci-dessus.")
 
     # Consignes d'usage ciblées (le modèle local sait mieux quoi déclencher).
     if has_fetch:
