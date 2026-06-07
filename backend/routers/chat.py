@@ -738,6 +738,18 @@ async def chat_ws(websocket: WebSocket):
 
     except WebSocketDisconnect:
         pass
+    except Exception as e:  # noqa: BLE001 — toute erreur serveur → message clair, pas de coupure brutale
+        msg = str(e)
+        if "model" in msg.lower() and "not found" in msg.lower():
+            hint = ("⚠️ Le modèle actif est introuvable dans Ollama. "
+                    "Choisis un modèle installé dans ⬡ Modèles (ou télécharge-le).")
+        else:
+            hint = "⚠️ Une erreur est survenue côté serveur."
+        try:
+            await websocket.send_text(json.dumps({"type": "token", "content": f"{hint}\n\n{msg[:300]}"}))
+            await websocket.send_text(json.dumps({"type": "done", "model": ""}))
+        except Exception:
+            pass
     finally:
         reader.cancel()
 

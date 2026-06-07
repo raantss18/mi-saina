@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     # Résumer (extractif, sans LLM) l'historique élagué au lieu de le couper net,
     # pour garder le fil sur de longues sessions. False = ancien comportement.
     CONTEXT_DIGEST: bool = True
+    # Raisonnement (« thinking ») des modèles qui le supportent (qwen3, deepseek…) :
+    #   "auto" → comportement par défaut du modèle
+    #   "on"   → force le raisonnement (meilleure qualité, plus lent)
+    #   "off"  → désactive le raisonnement (plus rapide, réponses directes)
+    THINK: str = "auto"
+    # Afficher le raisonnement <think>…</think> dans le chat. False = chat épuré
+    # (le raisonnement est masqué ; la réponse reste complète).
+    SHOW_THINKING: bool = False
 
     class Config:
         env_file = str(_ENV_FILE)
@@ -119,6 +127,17 @@ EDITABLE_SETTINGS: dict = {
         "type": "bool",
         "label": "Découpage des tâches lourdes",
         "help": "Découpe automatiquement les demandes complexes en sous-tâches.",
+    },
+    "THINK": {
+        "type": "choice", "choices": ["auto", "on", "off"],
+        "label": "Raisonnement du modèle (thinking)",
+        "help": "auto = défaut du modèle · on = force le raisonnement (qualité, plus lent) · "
+                "off = réponses directes (plus rapide). Pour qwen3, deepseek-r1, etc.",
+    },
+    "SHOW_THINKING": {
+        "type": "bool",
+        "label": "Afficher le raisonnement dans le chat",
+        "help": "Désactivé = chat épuré (le bloc <think>…</think> est masqué, la réponse reste complète).",
     },
 }
 
