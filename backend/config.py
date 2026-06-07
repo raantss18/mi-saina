@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # Afficher le raisonnement <think>…</think> dans le chat. False = chat épuré
     # (le raisonnement est masqué ; la réponse reste complète).
     SHOW_THINKING: bool = False
+    # Langue de l'application et des réponses de l'assistant : en / fr / mg.
+    LANGUAGE: str = "en"
+    # Mémoire automatique : extrait en arrière-plan les faits/préférences durables
+    # de l'utilisateur et enrichit profile.md (sans [REMEMBER:] explicite).
+    AUTO_MEMORY: bool = True
 
     class Config:
         env_file = str(_ENV_FILE)
@@ -138,6 +143,17 @@ EDITABLE_SETTINGS: dict = {
         "type": "bool",
         "label": "Afficher le raisonnement dans le chat",
         "help": "Désactivé = chat épuré (le bloc <think>…</think> est masqué, la réponse reste complète).",
+    },
+    "LANGUAGE": {
+        "type": "choice", "choices": ["en", "fr", "mg"],
+        "label": "Langue / Language / Fiteny",
+        "help": "Langue de l'interface et des réponses de l'assistant (English, Français, Malagasy).",
+    },
+    "AUTO_MEMORY": {
+        "type": "bool",
+        "label": "Mémoire automatique",
+        "help": "Enrichit automatiquement le profil (profile.md) avec les préférences/faits durables "
+                "détectés au fil des échanges, sans avoir à le demander.",
     },
 }
 

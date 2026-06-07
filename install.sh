@@ -235,6 +235,26 @@ case "$CHOICE" in
     *) MODEL="$QWEN" ;;
 esac
 info "Modèle choisi : $MODEL"
+
+# ── Langue de l'application (défaut : anglais) ─────────────────────
+echo ""
+echo "Language / Langue / Fiteny :  1) English   2) Français   3) Malagasy"
+if [ -t 0 ]; then read -rp "Choice [1] : " LCHOICE; else LCHOICE=1; fi
+case "${LCHOICE:-1}" in 2) APP_LANG=fr ;; 3) APP_LANG=mg ;; *) APP_LANG=en ;; esac
+mkdir -p "$HOME/.config/mi-saina"
+python3 - "$APP_LANG" <<'PY' || true
+import json, os, sys
+p = os.path.expanduser("~/.config/mi-saina/settings.json")
+d = {}
+try:
+    with open(p) as f: d = json.load(f)
+except Exception: pass
+d["LANGUAGE"] = sys.argv[1]
+os.makedirs(os.path.dirname(p), exist_ok=True)
+open(p, "w").write(json.dumps(d, indent=2, ensure_ascii=False))
+PY
+ok "Langue : $APP_LANG"
+
 info "Téléchargement (peut prendre plusieurs minutes)…"
 ollama pull "$MODEL" || warn "Échec du téléchargement — tu pourras réessayer avec : ollama pull $MODEL"
 

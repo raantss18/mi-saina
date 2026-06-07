@@ -9,7 +9,7 @@ from routers import (chat, shell, search, memory as memory_router,
                      models as models_router, config_router, schedule, update, rag)
 from services.scheduler import scheduler_loop
 
-app = FastAPI(title="mi-saina API", version="1.0.3")
+app = FastAPI(title="mi-saina API", version="1.0.4")
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -35,6 +35,8 @@ async def _origin_guard(request: Request, call_next):
 
 @app.on_event("startup")
 async def _start_scheduler():
+    from services import userctx
+    userctx.ensure_files()   # crée context.md/profile.md vides si absents
     asyncio.create_task(scheduler_loop())
 
 app.add_middleware(

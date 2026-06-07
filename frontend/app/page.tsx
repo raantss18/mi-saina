@@ -11,8 +11,10 @@ import SchedulePanel from "../components/SchedulePanel";
 import ThemeToggle from "../components/ThemeToggle";
 import CommandPalette, { Command } from "../components/CommandPalette";
 import WelcomeScreen from "../components/WelcomeScreen";
+import ArtifactsPanel, { Artifact, extractArtifacts } from "../components/ArtifactsPanel";
 import { API_BASE, WS_BASE } from "../lib/config";
 import { notify } from "../lib/desktop";
+import { t, getLang, setLang } from "../lib/i18n";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -64,6 +66,8 @@ export default function Home() {
   const [skillSuggestion, setSkillSuggestion] = useState<{ name: string; description: string; commands: string[]; update?: boolean } | null>(null);
   const pendingSkillRef = useRef<string | null>(null);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [showArtifacts, setShowArtifacts] = useState(false);
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const turnFailureRef = useRef(false);
   const [panel, setPanel] = useState<Panel>(null);
@@ -84,6 +88,16 @@ export default function Home() {
   useEffect(() => {
     fetch(`${API_BASE}/config/skills`)
       .then(r => r.json()).then(setSkills).catch(() => {});
+  }, []);
+
+  // Synchronise la langue de l'UI avec le réglage backend (choix fait à l'install).
+  useEffect(() => {
+    fetch(`${API_BASE}/config/settings`).then(r => r.json()).then(d => {
+      const lang = d.values?.LANGUAGE;
+      if ((lang === "en" || lang === "fr" || lang === "mg") && lang !== getLang()) {
+        setLang(lang); window.location.reload();
+      }
+    }).catch(() => {});
   }, []);
 
   const connect = useCallback(() => {
@@ -118,8 +132,10 @@ export default function Home() {
         }
         setMessages(prev => {
           const last = prev[prev.length - 1];
-          if (last?.role === "assistant")
+          if (last?.role === "assistant") {
+            queueMicrotask(() => addArtifactsFromText(last.content));  // auto-épinglage des blocs de code
             return [...prev.slice(0, -1), { ...last, streaming: false, model: data.model }];
+          }
           return prev;
         });
         return;
@@ -373,6 +389,30 @@ export default function Home() {
     if (lastUserMsg) sendMessage(lastUserMsg);
   };
 
+  // Artefacts : extrait les blocs de code d'un texte (dédupliqués par contenu).
+  const addArtifactsFromText = (text: string) => {
+    const found = extractArtifacts(text);
+    if (!found.length) return;
+    setArtifacts(prev => {
+      const seen = new Set(prev.map(a => a.content));
+      const fresh = found.filter(f => !seen.has(f.content)).map(f => ({
+        ...f, id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      }));
+      return fresh.length ? [...prev, ...fresh] : prev;
+    });
+  };
+
+  // Épingler manuellement la dernière réponse entière comme artefact (palette ⌘K).
+  const pinLastResponse = () => {
+    const last = [...messages].reverse().find(m => m.role === "assistant");
+    if (!last) return;
+    setArtifacts(prev => [...prev, {
+      id: `${Date.now()}-pin`, title: last.content.split("\n")[0].slice(0, 40) || "réponse",
+      lang: "md", content: last.content,
+    }]);
+    setShowArtifacts(true);
+  };
+
   const clearChat = () => { setMessages([]); setLastUserMsg(""); };
 
   // Charge l'historique d'une session existante dans le fil de discussion
@@ -465,6 +505,25 @@ export default function Home() {
     e.target.value = "";
   };
 
+  // Capture d'écran → jointe comme image (analysée par un modèle vision).
+  const captureScreen = async () => {
+    try {
+      const md = navigator.mediaDevices as MediaDevices | undefined;
+      if (!md?.getDisplayMedia) { alert("Capture d'écran non disponible dans ce contexte."); return; }
+      const stream = await md.getDisplayMedia({ video: true });
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
+      canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL("image/png").split(",")[1];
+      stream.getTracks().forEach(t => t.stop());
+      setAttachments(prev => [...prev, { type: "image", name: `capture-${Date.now()}.png`, data }]);
+    } catch { /* annulé par l'utilisateur ou non supporté */ }
+  };
+
   // Skill autocomplete
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -499,16 +558,18 @@ export default function Home() {
 
   // Actions de la palette ⌘K
   const paletteCommands: Command[] = [
-    { id: "go-chat", icon: "💬", label: "Aller au chat", keywords: "retour chat", run: () => setPanel(null) },
-    { id: "new-chat", icon: "✏", label: "Nouvelle conversation", run: () => { setPanel(null); clearChat(); } },
-    { id: "rerun", icon: "↺", label: "Relancer le dernier prompt", run: rerunLast },
-    { id: "copy", icon: "⎘", label: "Copier la dernière réponse", run: copyLastResponse },
-    { id: "stop", icon: "⏹", label: "Arrêter la génération", run: stopGeneration },
-    { id: "terminal", icon: "▣", label: "Afficher/masquer le terminal", run: () => setShowTerminal(v => !v) },
-    { id: "sidebar", icon: "☰", label: "Replier/déplier la barre latérale", hint: "Ctrl/⌘ B", run: toggleSidebar },
-    { id: "panel-models", icon: "⬡", label: "Ouvrir : Modèles", keywords: "modele model", run: () => setPanel("models") },
-    { id: "panel-config", icon: "⚙", label: "Ouvrir : Config", keywords: "reglages settings", run: () => setPanel("config") },
-    { id: "panel-schedule", icon: "⏰", label: "Ouvrir : Tâches planifiées", keywords: "schedule cron", run: () => setPanel("schedule") },
+    { id: "go-chat", icon: "💬", label: t("cmdGoChat"), keywords: "chat", run: () => setPanel(null) },
+    { id: "new-chat", icon: "✏", label: t("cmdNewChat"), run: () => { setPanel(null); clearChat(); } },
+    { id: "rerun", icon: "↺", label: t("cmdRerun"), run: rerunLast },
+    { id: "copy", icon: "⎘", label: t("cmdCopy"), run: copyLastResponse },
+    { id: "stop", icon: "⏹", label: t("cmdStop"), run: stopGeneration },
+    { id: "terminal", icon: "▣", label: t("cmdTerminal"), run: () => setShowTerminal(v => !v) },
+    { id: "artifacts", icon: "❖", label: t("cmdArtifacts"), run: () => setShowArtifacts(v => !v) },
+    { id: "pin", icon: "📌", label: t("cmdPinResp"), run: pinLastResponse },
+    { id: "sidebar", icon: "☰", label: t("cmdSidebar"), hint: "Ctrl/⌘ B", run: toggleSidebar },
+    { id: "panel-models", icon: "⬡", label: t("cmdOpenModels"), keywords: "modele model modely", run: () => setPanel("models") },
+    { id: "panel-config", icon: "⚙", label: t("cmdOpenConfig"), keywords: "reglages settings", run: () => setPanel("config") },
+    { id: "panel-schedule", icon: "⏰", label: t("cmdOpenTasks"), keywords: "schedule cron asa", run: () => setPanel("schedule") },
     ...skills.map((s): Command => ({
       id: `skill-${s.name}`, icon: s.icon || "▸", label: `Skill : ${s.trigger}`,
       hint: s.description, keywords: s.name, run: () => applySkill(s),
@@ -544,13 +605,13 @@ export default function Home() {
           background: "var(--surface)", flexShrink: 0,
         }}>
           <button onClick={toggleSidebar}
-            title={`${sidebarOpen ? "Replier" : "Déplier"} la barre latérale (Ctrl/⌘ + B)`}
-            aria-label="Basculer la barre latérale"
+            title={t("sidebarTip")}
+            aria-label={t("sidebarTip")}
             style={{ ...btnStyle(), padding: "4px 8px", fontSize: 14 }}>
             ☰
           </button>
-          <span style={{ color: "var(--text-muted)", fontSize: 10 }}>modèle:</span>
-          <span title="Modèle actif — change-le dans ⬡ Modèles"
+          <span style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("model")}</span>
+          <span title={t("modelActiveTip")}
             style={{ background: "var(--border)", padding: "2px 8px", borderRadius: 12, fontSize: 11, color: "var(--accent)" }}>
             {activeModel}
           </span>
@@ -558,22 +619,25 @@ export default function Home() {
           {/* Contrôles principaux */}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
             {/* Re-run */}
-            <button onClick={rerunLast} disabled={!lastUserMsg || streaming} title="Relancer le dernier prompt (↺)" style={btnStyle()}>
+            <button onClick={rerunLast} disabled={!lastUserMsg || streaming} title={t("rerun")} style={btnStyle()}>
               ↺
             </button>
             {/* Copy */}
-            <button onClick={copyLastResponse} title="Copier la dernière réponse" style={btnStyle()}>
+            <button onClick={copyLastResponse} title={t("copyResp")} style={btnStyle()}>
               ⎘
             </button>
             {/* Clear */}
-            <button onClick={clearChat} title="Effacer la conversation" style={btnStyle(false, true)}>
+            <button onClick={clearChat} title={t("clearChat")} style={btnStyle(false, true)}>
               🗑
             </button>
             <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
-            <button onClick={() => setShowTerminal(v => !v)} title="Afficher/masquer la sortie du terminal" style={btnStyle(showTerminal)}>
-              ▣ Terminal
+            <button onClick={() => setShowTerminal(v => !v)} title={t("terminalTip")} style={btnStyle(showTerminal)}>
+              ▣ {t("terminal")}
             </button>
-            <button onClick={() => setPaletteOpen(true)} title="Palette de commandes (Ctrl/⌘ + K)" style={btnStyle()}>
+            <button onClick={() => setShowArtifacts(v => !v)} title={t("artifactsTip")} style={btnStyle(showArtifacts)}>
+              ❖ {t("artifacts")}{artifacts.length > 0 ? ` (${artifacts.length})` : ""}
+            </button>
+            <button onClick={() => setPaletteOpen(true)} title={t("paletteTip")} style={btnStyle()}>
               ⌘K
             </button>
             <ThemeToggle />
@@ -584,12 +648,12 @@ export default function Home() {
                 color: taskStatus === "running" ? "var(--accent)" : taskStatus === "success" ? "var(--green)" : taskStatus === "failure" ? "var(--red)" : "var(--yellow)",
                 background: "var(--border)",
               }}>
-                {taskStatus === "running" ? "⟳ en cours" : taskStatus === "success" ? "✓ succès" : taskStatus === "failure" ? "✗ échec" : "■ arrêté"}
+                {taskStatus === "running" ? t("statusRunning") : taskStatus === "success" ? t("statusSuccess") : taskStatus === "failure" ? t("statusFailure") : t("statusStopped")}
               </span>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: 4 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: connected ? "var(--green)" : "var(--red)" }} />
-              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{connected ? "connecté" : "hors ligne"}</span>
+              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{connected ? t("connected") : t("offline")}</span>
             </div>
           </div>
         </div>
@@ -678,6 +742,18 @@ export default function Home() {
               onInput={sendShellInput}
             />
           )}
+          {showArtifacts && (
+            <ArtifactsPanel
+              artifacts={artifacts}
+              onClose={() => setShowArtifacts(false)}
+              onRemove={(id) => setArtifacts(prev => prev.filter(a => a.id !== id))}
+              onClear={() => setArtifacts([])}
+              labels={{
+                title: t("artTitle"), empty: t("artEmpty"), copy: t("artCopy"),
+                download: t("artDownload"), remove: t("artRemove"), clear: t("artClear"),
+              }}
+            />
+          )}
         </div>
 
         {/* Search results */}
@@ -738,11 +814,16 @@ export default function Home() {
         }}>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {/* Attachment */}
-            <button onClick={() => fileRef.current?.click()} title="Joindre un fichier ou une image (📎)"
+            <button onClick={() => fileRef.current?.click()} title={t("attachTip")}
               style={{ ...btnStyle(), padding: "6px 8px" }}>
               📎
             </button>
             <input ref={fileRef} type="file" multiple accept="*/*" style={{ display: "none" }} onChange={handleFileAttach} />
+            {/* Capture d'écran */}
+            <button onClick={captureScreen} title={t("captureTip")}
+              style={{ ...btnStyle(), padding: "6px 8px" }}>
+              📷
+            </button>
 
             {/* Input */}
             <div style={{ flex: 1, display: "flex", alignItems: "flex-end", background: "var(--bg)", borderRadius: 6, border: "1px solid var(--border)", padding: "0 10px" }}>
@@ -766,7 +847,7 @@ export default function Home() {
                   if (e.key === "Escape") { setSkillMenu(false); }
                 }}
                 rows={1}
-                placeholder="Message... (Maj+Entrée = nouvelle ligne) ou /skill pour les raccourcis"
+                placeholder={t("inputPlaceholder")}
                 disabled={!connected}
                 style={{
                   flex: 1, background: "transparent", border: "none", outline: "none",
@@ -778,7 +859,7 @@ export default function Home() {
 
             {/* Stop / Send */}
             {streaming ? (
-              <button onClick={stopGeneration} title="Arrêter la génération (⏹)"
+              <button onClick={stopGeneration} title={t("stopTip")}
                 style={{ background: "var(--red)", border: "none", color: "#fff", padding: "8px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
                 ⏹
               </button>

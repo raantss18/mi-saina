@@ -8,7 +8,7 @@ import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from config import settings
-from services.llm import stream_response, select_model
+from services.llm import stream_response, select_model, complete
 from services.memory import (
     add_message, get_session_messages, build_context_prefix, create_session,
     update_session_title, session_message_count,
@@ -32,8 +32,18 @@ SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 _DEFAULT_SYSTEM = "Tu es mi-saina, un assistant IA local créé par Antsa, expert avec accès complet à la machine Linux."
 
 
+_LANG_DIRECTIVE = {
+    "en": "Always respond in English.",
+    "fr": "Réponds toujours en français.",
+    "mg": "Mamalia amin'ny teny malagasy foana (réponds toujours en malgache).",
+}
+
+
 def _load_system_prompt() -> str:
     base = SYSTEM_PROMPT_FILE.read_text() if SYSTEM_PROMPT_FILE.exists() else _DEFAULT_SYSTEM
+    # Langue des réponses (réglable) — placée en tête pour primer.
+    lang = _LANG_DIRECTIVE.get((settings.LANGUAGE or "en").lower(), _LANG_DIRECTIVE["en"])
+    base = f"{lang}\n\n{base}"
     # Infos matériel/distribution détectées à l'exécution (jamais versionnées)
     parts = [base, system_block()]
     ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
@@ -806,6 +816,10 @@ async def chat_ws(websocket: WebSocket):
 
             if not stopped:
                 await websocket.send_text(json.dumps({"type": "done", "model": select_model(task_type)}))
+                # Mémoire automatique : extraire un fait durable du message utilisateur
+                # (en arrière-plan, après la réponse → ne ralentit pas le tour).
+                if settings.AUTO_MEMORY:
+                    asyncio.create_task(_auto_memory(user_input, websocket))
 
     except WebSocketDisconnect:
         pass
@@ -823,6 +837,35 @@ async def chat_ws(websocket: WebSocket):
             pass
     finally:
         reader.cancel()
+
+
+_AUTO_MEM_SYSTEM = (
+    "Extract ONE durable, reusable fact or preference about the USER or their machine from their "
+    "message (e.g. their name, tools/editors they use, their setup, recurring preferences, language). "
+    "Ignore one-off task details and questions. If there is nothing durable, reply EXACTLY: NONE. "
+    "Otherwise reply with only the fact, one short sentence."
+)
+
+
+async def _auto_memory(user_input: str, websocket: WebSocket) -> None:
+    """Extrait (modèle rapide, en fond) un fait durable et enrichit profile.md."""
+    if len(user_input.strip()) < 12:
+        return
+    try:
+        raw = await complete(
+            [{"role": "system", "content": _AUTO_MEM_SYSTEM},
+             {"role": "user", "content": user_input}],
+            model=settings.FAST_MODEL, num_predict=80, temperature=0.0, think=False,
+        )
+        fact = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip().strip("-• ").strip()
+        if not fact or fact.upper().startswith("NONE") or len(fact) > 200:
+            return
+        before = userctx.read_profile()
+        userctx.append_profile(fact)
+        if userctx.read_profile() != before:   # un nouveau fait a bien été ajouté
+            await websocket.send_text(json.dumps({"type": "memory_saved", "fact": fact}))
+    except Exception:
+        pass
 
 
 async def _auto_name_session(session_id: str, user_msg: str, assistant_msg: str,

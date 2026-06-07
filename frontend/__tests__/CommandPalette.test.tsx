@@ -60,6 +60,7 @@ describe("CommandPalette", () => {
   it("shows an empty state when nothing matches", () => {
     render(<CommandPalette open commands={make()} onClose={() => {}} />);
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "zzzzz" } });
-    expect(screen.getByText(/Aucune action/)).toBeInTheDocument();
+    // langue par défaut = anglais (i18n)
+    expect(screen.getByText(/No action matches/)).toBeInTheDocument();
   });
 });

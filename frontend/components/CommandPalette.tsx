@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { t } from "../lib/i18n";
 
 export interface Command {
   id: string;
@@ -73,7 +74,7 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
             else if (e.key === "Enter") { e.preventDefault(); exec(filtered[index]); }
             else if (e.key === "Escape") { e.preventDefault(); onClose(); }
           }}
-          placeholder="Rechercher une action…  (↑↓ pour naviguer, Entrée pour lancer)"
+          placeholder={t("paletteSearch")}
           style={{
             width: "100%", background: "transparent", border: "none", outline: "none",
             color: "var(--text)", fontSize: 15, padding: "14px 16px",
@@ -83,7 +84,7 @@ export default function CommandPalette({ open, commands, onClose }: Props) {
         <div style={{ maxHeight: 360, overflowY: "auto", padding: 6 }}>
           {filtered.length === 0 && (
             <div style={{ padding: "16px", color: "var(--text-muted)", fontSize: 13, textAlign: "center" }}>
-              Aucune action ne correspond.
+              {t("paletteEmpty")}
             </div>
           )}
           {filtered.map((c, i) => (

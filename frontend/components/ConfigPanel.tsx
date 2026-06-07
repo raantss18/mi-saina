@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
 import { isTauri, isAutostartEnabled, setAutostart } from "../lib/desktop";
+import { getLang, setLang, Lang } from "../lib/i18n";
 
 interface Skill {
   name: string;
@@ -108,6 +109,9 @@ export default function ConfigPanel() {
       const d = await r.json();
       setSetValues(d.values);
       setSetOk("✓ Enregistré"); setTimeout(() => setSetOk(""), 2000);
+      // Changement de langue → synchronise l'UI et recharge (i18n par rechargement).
+      const lang = d.values?.LANGUAGE as Lang | undefined;
+      if (lang && lang !== getLang()) { setLang(lang); window.location.reload(); }
     } else {
       const d = await r.json().catch(() => ({}));
       setSetOk("✗ " + (d.detail || "Erreur")); setTimeout(() => setSetOk(""), 3000);

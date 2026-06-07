@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { t } from "../lib/i18n";
 
 interface Props {
   onPick: (text: string) => void;
@@ -42,7 +43,7 @@ export default function WelcomeScreen({ onPick }: Props) {
           style={{ borderRadius: 18, marginBottom: 12, boxShadow: "var(--shadow)" }} />
         <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", letterSpacing: -0.5 }}>mi-saina</div>
         <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 6 }}>
-          Votre assistant IA local — il comprend, agit sur votre système, et apprend.
+          {t("welcomeTagline")}
         </div>
       </div>
 
@@ -51,7 +52,7 @@ export default function WelcomeScreen({ onPick }: Props) {
           maxWidth: 560, background: "var(--surface-2)", border: "1px solid var(--accent)",
           borderRadius: "var(--radius)", padding: "14px 16px", fontSize: 13, color: "var(--text)",
         }}>
-          <div style={{ fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>👋 Bienvenue !</div>
+          <div style={{ fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>{t("welcomeHi")}</div>
           <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, color: "var(--text-muted)", lineHeight: 1.7 }}>
             <li>Décrivez une tâche en langage naturel — mi-saina propose et exécute les commandes.</li>
             <li>Les commandes sensibles demandent votre validation avant de s'exécuter.</li>
@@ -63,7 +64,7 @@ export default function WelcomeScreen({ onPick }: Props) {
               background: "var(--accent)", border: "none", color: "var(--accent-contrast)",
               padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700,
             }}>
-              C'est parti
+              {t("welcomeGo")}
             </button>
           </div>
         </div>

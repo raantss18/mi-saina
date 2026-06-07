@@ -118,15 +118,22 @@ async def stream_response(messages: list, task_type: str = "reason"):
 
 
 async def complete(messages: list, model: str | None = None,
-                   num_predict: int = 512, temperature: float = 0.2) -> str:
-    """Réponse complète (non streamée) — utilisée par le planificateur."""
+                   num_predict: int = 512, temperature: float = 0.2,
+                   think: bool | None = None) -> str:
+    """Réponse complète (non streamée). `think=False` désactive le raisonnement
+    (utile pour les tâches utilitaires : sinon le « thinking » consomme le budget)."""
     client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
-    resp = await client.chat(
+    kwargs = dict(
         model=model or settings.REASONING_MODEL,
         messages=messages,
         stream=False,
-        options={"num_ctx": num_ctx(),
-                 "num_predict": num_predict,
-                 "temperature": temperature},
+        options={"num_ctx": num_ctx(), "num_predict": num_predict, "temperature": temperature},
     )
+    if think is not None:
+        kwargs["think"] = think
+    try:
+        resp = await client.chat(**kwargs)
+    except TypeError:
+        kwargs.pop("think", None)
+        resp = await client.chat(**kwargs)
     return resp["message"]["content"]

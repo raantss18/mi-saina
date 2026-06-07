@@ -60,6 +60,17 @@ def append_profile(fact: str) -> None:
     write_profile(existing.rstrip() + "\n" + line)
 
 
+def ensure_files() -> None:
+    """Crée des fichiers de mémoire vides à la 1re utilisation (jamais versionnés).
+    Garantit qu'une nouvelle installation a bien context.md + profile.md."""
+    CONFIG_HOME.mkdir(parents=True, exist_ok=True)
+    # Fichiers vides (0 octet) : non injectés au prompt tant qu'ils sont vides,
+    # mais présents/éditables dès la 1re installation.
+    for f in (CONTEXT_FILE, PROFILE_FILE):
+        if not f.exists():
+            f.write_text("", encoding="utf-8")
+
+
 def read_project_context() -> str:
     """Lit MISAINA.md (ou README.md) dans le dossier de projet configuré, si présent."""
     pdir = getattr(settings, "PROJECT_DIR", "") or ""

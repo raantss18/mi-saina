@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
+import { t } from "../lib/i18n";
 
 interface Session {
   id: string;
@@ -33,11 +34,11 @@ interface Props {
   onNavigate?: (panel: NavPanel) => void;
 }
 
-const NAV: { id: NavPanel; icon: string; label: string; hint: string }[] = [
-  { id: null, icon: "💬", label: "Chat", hint: "Revenir à la conversation" },
-  { id: "models", icon: "⬡", label: "Modèles", hint: "Gérer les modèles Ollama (activer, télécharger, mettre à jour)" },
-  { id: "config", icon: "⚙", label: "Config", hint: "System prompt, skills, mémoire et réglages" },
-  { id: "schedule", icon: "⏰", label: "Tâches", hint: "Tâches planifiées exécutées en arrière-plan" },
+const NAV: { id: NavPanel; icon: string; label: string }[] = [
+  { id: null, icon: "💬", label: t("navChat") },
+  { id: "models", icon: "⬡", label: t("navModels") },
+  { id: "config", icon: "⚙", label: t("navConfig") },
+  { id: "schedule", icon: "⏰", label: t("navTasks") },
 ];
 
 export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSession, refreshKey = 0, activePanel = null, onNavigate }: Props) {
@@ -125,7 +126,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
               <button
                 key={item.label}
                 onClick={() => onNavigate?.(item.id)}
-                title={item.hint}
+                title={item.label}
                 style={{
                   display: "flex", alignItems: "center", gap: 8, width: "100%",
                   padding: "6px 8px", borderRadius: 6, cursor: "pointer", fontSize: 12,
@@ -145,21 +146,21 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
 
         <button
           onClick={handleNew}
-          title="Démarrer une nouvelle conversation vierge"
+          title={t("newSessionTip")}
           style={{
             width: "100%", padding: "6px", background: "var(--accent-dim, #20342a)",
             border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 4,
             cursor: "pointer", fontSize: 12,
           }}
         >
-          + Nouvelle session
+          {t("newSession")}
         </button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
         {sessions.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 11, padding: "8px 12px" }}>
-            Aucune session
+            {t("noSession")}
           </div>
         )}
         {sessions.map(s => (
@@ -199,7 +200,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
       </div>
 
       <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>RECHERCHE DANS L'HISTORIQUE</div>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>{t("histSearch")}</div>
         <div style={{ display: "flex", gap: 4 }}>
           <input
             value={histQuery}
@@ -239,7 +240,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
       </div>
 
       <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>RECHERCHE SÉMANTIQUE</div>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>{t("semSearch")}</div>
         <div style={{ display: "flex", gap: 4 }}>
           <input
             value={searchQuery}
