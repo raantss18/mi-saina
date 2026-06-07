@@ -10,6 +10,8 @@ import json
 import os
 import re
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -142,8 +144,13 @@ async def _update_source():
 
     if has_systemd:
         yield _ev({"log": "🔄 Redémarrage des services… (la connexion va se couper, c'est normal)"})
-        # Détaché : laisse le temps au flux d'arriver avant de redémarrer le backend.
-        os.system("(sleep 2 && systemctl --user restart mi-saina-backend mi-saina-frontend) >/dev/null 2>&1 &")
+        # Détaché (commande fixe, aucune interpolation) : laisse le flux arriver
+        # avant de redémarrer le backend.
+        subprocess.Popen(
+            ["bash", "-c", "sleep 2 && systemctl --user restart mi-saina-backend mi-saina-frontend"],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
     else:
         yield _ev({"log": "✅ Mise à jour appliquée. Recompile/relance la fenêtre desktop pour terminer (npm run desktop:build)."})
 
@@ -157,8 +164,11 @@ async def _update_run():
     if not asset:
         yield _ev({"log": "✗ Aucun installeur .run dans la dernière release."})
         return
-    dest = Path("/tmp") / asset["name"]
-    yield _ev({"log": f"📥 Téléchargement de {asset['name']}…"})
+    # Dossier temporaire privé (0700) → pas d'attaque par lien symbolique dans /tmp.
+    tmpdir = Path(tempfile.mkdtemp(prefix="mi-saina-upd-"))
+    safe_name = os.path.basename(asset["name"]) or "mi-saina.run"
+    dest = tmpdir / safe_name
+    yield _ev({"log": f"📥 Téléchargement de {safe_name}…"})
     try:
         async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
             async with client.stream("GET", asset["browser_download_url"]) as resp:
@@ -170,8 +180,12 @@ async def _update_run():
         yield _ev({"log": f"✗ Téléchargement échoué : {e}"})
         return
     yield _ev({"log": "🚀 Lancement de l'installeur (mot de passe administrateur demandé)…"})
-    # pkexec affiche une fenêtre graphique de mot de passe pour l'install dans /opt.
-    os.system(f"(setsid pkexec sh {dest} >/dev/null 2>&1 || setsid sh {dest} >/dev/null 2>&1) &")
+    # subprocess (liste, sans shell) : pkexec affiche une fenêtre graphique de mot
+    # de passe pour l'installation dans /opt ; repli sans pkexec si indisponible.
+    launcher = "pkexec" if shutil.which("pkexec") else None
+    cmd = [launcher, "sh", str(dest)] if launcher else ["sh", str(dest)]
+    subprocess.Popen(cmd, start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     yield _ev({"log": "✅ Installeur lancé. Suis la fenêtre d'installation, puis relance mi-saina."})
 
 

@@ -591,8 +591,27 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
     return stopped, last, executed
 
 
+def _origin_allowed(origin: str | None) -> bool:
+    """Garde anti-CSWSH : un site web malveillant ouvert dans un navigateur local
+    pourrait sinon se connecter à ce WebSocket (qui exécute des commandes shell).
+    On n'autorise que les origines locales (web dev) et l'appli desktop (tauri)."""
+    if not origin:
+        return True  # clients natifs/CLI locaux (pas d'origine de navigateur)
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(origin).hostname or "").lower()
+    except Exception:
+        return False
+    if origin.startswith("tauri://"):
+        return True
+    return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
+
+
 @router.websocket("/ws")
 async def chat_ws(websocket: WebSocket):
+    if not _origin_allowed(websocket.headers.get("origin")):
+        await websocket.close(code=1008)  # Policy Violation
+        return
     await websocket.accept()
     session_id = None
     is_new_session = True

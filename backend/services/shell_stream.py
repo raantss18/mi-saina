@@ -64,15 +64,20 @@ AUR_HELPERS = ("paru", "yay", "pikaur", "trizen", "pamac")
 
 DANGEROUS_PATTERNS = [
     r"rm\s+-rf\s+/[^/]",
+    r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/(\s|$|\*)",   # rm -rf /  ou  rm -rf /*
+    r"rm\s+-[a-z]*f[a-z]*r[a-z]*\s+/(\s|$|\*)",   # rm -fr /
+    r"rm\s+.*--no-preserve-root",
     r"dd\s+if=",
     r"mkfs\.",
-    r":\(\)\s*\{.*\}",
-    r">\s+/dev/sd",
+    r"\bmkfs\b",
+    r":\(\)\s*\{.*\}",                              # fork bomb
+    r">\s*/dev/(sd|nvme|vd|mmcblk)",
+    r"chmod\s+-R\s+0*777\s+/(\s|$)",
 ]
 
 
 def _is_dangerous(cmd: str) -> bool:
-    return any(re.search(p, cmd) for p in DANGEROUS_PATTERNS)
+    return any(re.search(p, cmd, re.IGNORECASE) for p in DANGEROUS_PATTERNS)
 
 
 # Commandes AUTORISÉES mais IRRÉVERSIBLES → confirmation demandée (mode « risky »)

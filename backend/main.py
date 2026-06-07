@@ -1,13 +1,36 @@
 import asyncio
+from urllib.parse import urlparse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import (chat, shell, search, memory as memory_router,
                      models as models_router, config_router, schedule, update)
 from services.scheduler import scheduler_loop
 
-app = FastAPI(title="mi-saina API", version="1.0.0")
+app = FastAPI(title="mi-saina API", version="1.0.1")
+
+
+def _origin_allowed(origin: str | None) -> bool:
+    """N'autorise que les origines locales (web dev) et l'appli desktop (tauri)."""
+    if not origin:
+        return True  # clients natifs/CLI locaux (pas d'origine de navigateur)
+    if origin.startswith("tauri://"):
+        return True
+    host = (urlparse(origin).hostname or "").lower()
+    return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
+
+
+@app.middleware("http")
+async def _origin_guard(request: Request, call_next):
+    """Anti-CSRF/DNS-rebinding : un site web malveillant ouvert localement ne doit
+    pas pouvoir déclencher d'endpoints (le backend exécute des commandes shell).
+    Les requêtes sans Origin (app native, curl) passent ; les origines distantes
+    de navigateur sont refusées."""
+    if not _origin_allowed(request.headers.get("origin")):
+        return JSONResponse({"detail": "origine non autorisée"}, status_code=403)
+    return await call_next(request)
 
 
 @app.on_event("startup")

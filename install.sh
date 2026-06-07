@@ -291,7 +291,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR/backend
-ExecStart=$VENV_DIR/bin/uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT
+ExecStart=$VENV_DIR/bin/uvicorn main:app --host 127.0.0.1 --port $BACKEND_PORT
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME
@@ -309,7 +309,7 @@ After=mi-saina-backend.service
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR/frontend
-ExecStart=/usr/bin/npm run dev -- --port $FRONTEND_PORT
+ExecStart=/usr/bin/npm run dev -- --hostname 127.0.0.1 --port $FRONTEND_PORT
 Restart=on-failure
 RestartSec=5
 Environment=HOME=$HOME

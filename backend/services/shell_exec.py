@@ -1,6 +1,5 @@
 import asyncio
 import os
-import re
 import shlex
 
 from config import settings
@@ -10,19 +9,13 @@ from services.shell_stream import (
     sanitize,
     _is_aur_helper,
     _strip_leading_sudo,
+    _is_dangerous,
 )
-
-DANGEROUS_PATTERNS = [
-    r"rm\s+-rf\s+/",
-    r"dd\s+if=",
-    r"mkfs\.",
-    r":\(\)\s*\{.*\}",  # fork bomb
-    r">\s+/dev/sd",
-]
 
 
 def is_dangerous(cmd: str) -> bool:
-    return any(re.search(p, cmd) for p in DANGEROUS_PATTERNS)
+    # Source unique : même liste de patterns que le chemin streaming (PTY).
+    return _is_dangerous(cmd)
 
 
 async def execute_command(cmd: str, sudo_password: str | None = None) -> dict:

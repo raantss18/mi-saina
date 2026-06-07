@@ -17,7 +17,9 @@ class Settings(BaseSettings):
     # génératifs (ex. gemma3) ne supportent pas /api/embeddings → on garde un petit
     # modèle d'embeddings séparé pour ne pas casser la recherche sémantique.
     EMBED_MODEL: str = "nomic-embed-text"
-    HOST: str = "0.0.0.0"
+    # Boucle locale uniquement : le backend exécute des commandes shell avec accès
+    # complet → ne JAMAIS l'exposer au réseau. (Override possible via .env si besoin.)
+    HOST: str = "127.0.0.1"
     PORT: int = 8000
     MAX_SEARCH_RESULTS: int = 5
     SHELL_TIMEOUT: int = 30
