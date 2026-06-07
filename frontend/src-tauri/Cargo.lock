@@ -2062,7 +2062,7 @@ dependencies = [
 
 [[package]]
 name = "mi-saina"
-version = "1.0.7"
+version = "1.0.8"
 dependencies = [
  "libc",
  "serde",

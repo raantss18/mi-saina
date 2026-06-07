@@ -116,7 +116,10 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
+      <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: 0.5, padding: "8px 12px 2px" }}>
+        {t("historyLabel")}
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "0 0 4px" }}>
         {sessions.length === 0 && (
           <div style={{ color: "var(--text-muted)", fontSize: 11, padding: "8px 12px" }}>
             {t("noSession")}

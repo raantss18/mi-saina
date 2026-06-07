@@ -7,13 +7,13 @@ interface Props {
   onPick: (text: string) => void;
 }
 
-const EXAMPLES: { icon: string; title: string; prompt: string }[] = [
-  { icon: "⬆", title: "Mets à jour mon système", prompt: "Mets à jour mon système" },
-  { icon: "🌐", title: "Résume une page web", prompt: "Résume cette page : https://" },
-  { icon: "📁", title: "Range mon dossier Téléchargements", prompt: "Liste ce qu'il y a dans mon dossier Téléchargements et propose un rangement" },
-  { icon: "🩺", title: "Diagnostique mon disque", prompt: "Montre l'espace disque utilisé et les plus gros dossiers de mon /home" },
-  { icon: "🔎", title: "Cherche un fichier", prompt: "Trouve et ouvre le fichier " },
-  { icon: "🧩", title: "Installe un paquet", prompt: "Installe le paquet " },
+const EXAMPLES: { icon: string; titleKey: Parameters<typeof t>[0]; promptKey: Parameters<typeof t>[0] }[] = [
+  { icon: "⬆", titleKey: "exUpdate", promptKey: "exUpdateP" },
+  { icon: "🌐", titleKey: "exWeb", promptKey: "exWebP" },
+  { icon: "📁", titleKey: "exDocs", promptKey: "exDocsP" },
+  { icon: "🩺", titleKey: "exDisk", promptKey: "exDiskP" },
+  { icon: "🔎", titleKey: "exFind", promptKey: "exFindP" },
+  { icon: "🧩", titleKey: "exPkg", promptKey: "exPkgP" },
 ];
 
 const SEEN_KEY = "ms-onboarded";
@@ -54,10 +54,10 @@ export default function WelcomeScreen({ onPick }: Props) {
         }}>
           <div style={{ fontWeight: 700, color: "var(--accent)", marginBottom: 6 }}>{t("welcomeHi")}</div>
           <ul style={{ margin: "0 0 10px 0", paddingLeft: 18, color: "var(--text-muted)", lineHeight: 1.7 }}>
-            <li>Décrivez une tâche en langage naturel — mi-saina propose et exécute les commandes.</li>
-            <li>Les commandes sensibles demandent votre validation avant de s'exécuter.</li>
-            <li>Ouvrez la palette d'actions avec <kbd>Ctrl</kbd>+<kbd>K</kbd>.</li>
-            <li>Tapez <code>/</code> pour vos raccourcis (skills) ; le panneau <strong>▣ Terminal</strong> montre la sortie brute.</li>
+            <li>{t("tour1")}</li>
+            <li>{t("tour2")}</li>
+            <li>{t("tour3")}</li>
+            <li>{t("tour4")}</li>
           </ul>
           <div style={{ textAlign: "right" }}>
             <button onClick={dismissTour} style={{
@@ -76,8 +76,8 @@ export default function WelcomeScreen({ onPick }: Props) {
       }}>
         {EXAMPLES.map(ex => (
           <button
-            key={ex.title}
-            onClick={() => onPick(ex.prompt)}
+            key={ex.titleKey}
+            onClick={() => onPick(t(ex.promptKey))}
             style={{
               display: "flex", alignItems: "center", gap: 10, textAlign: "left",
               background: "var(--surface)", border: "1px solid var(--border)",
@@ -88,7 +88,7 @@ export default function WelcomeScreen({ onPick }: Props) {
             onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; }}
           >
             <span style={{ fontSize: 20 }}>{ex.icon}</span>
-            <span>{ex.title}</span>
+            <span>{t(ex.titleKey)}</span>
           </button>
         ))}
       </div>

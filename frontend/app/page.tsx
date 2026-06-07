@@ -14,6 +14,7 @@ import ArtifactsPanel, { Artifact, extractArtifacts } from "../components/Artifa
 import { API_BASE, WS_BASE } from "../lib/config";
 import { notify } from "../lib/desktop";
 import { t, getLang, setLang } from "../lib/i18n";
+import { modelLabel } from "../lib/models";
 
 interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -78,6 +79,7 @@ export default function Home() {
   const [skillIndex, setSkillIndex] = useState(0);   // item surligné dans l'autocomplétion
   const [lastUserMsg, setLastUserMsg] = useState("");
   const [memoryRefresh, setMemoryRefresh] = useState(0);
+  const [sessionTitle, setSessionTitle] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
@@ -314,7 +316,8 @@ export default function Home() {
       }
 
       if (data.type === "session_title") {
-        // Rafraîchir le panel sessions pour afficher le nouveau titre
+        // Titre auto → affiché en haut de la discussion + rafraîchit la sidebar
+        if (data.title) setSessionTitle(data.title);
         setMemoryRefresh(n => n + 1);
         return;
       }
@@ -434,13 +437,18 @@ export default function Home() {
     setShowArtifacts(true);
   };
 
-  const clearChat = () => { setMessages([]); setLastUserMsg(""); };
+  const clearChat = () => { setMessages([]); setLastUserMsg(""); setSessionTitle(""); };
 
   // Charge l'historique d'une session existante dans le fil de discussion
   const loadSession = async (id: string) => {
     setSessionId(id);
     setTaskStatus("idle");
     setMessages([]);
+    // Titre de la session (affiché en haut de la discussion)
+    fetch(`${API_BASE}/memory/sessions`).then(r => r.json()).then((list) => {
+      const s = Array.isArray(list) ? list.find((x: { id: string }) => x.id === id) : null;
+      setSessionTitle(s?.title || "");
+    }).catch(() => setSessionTitle(""));
     try {
       const res = await fetch(`${API_BASE}/memory/sessions/${id}/messages`);
       const data = await res.json();
@@ -611,7 +619,7 @@ export default function Home() {
         <MemoryPanel
           activeSessionId={sessionId}
           onSelectSession={(id) => { loadSession(id); setPanel(null); }}
-          onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); }}
+          onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); setSessionTitle(""); }}
           refreshKey={memoryRefresh}
         />
       )}
@@ -640,8 +648,8 @@ export default function Home() {
               color: "var(--accent)", padding: "3px 8px", borderRadius: 12, fontSize: 11,
               cursor: "pointer", outline: "none", maxWidth: 220,
             }}>
-            {activeModel && !models.includes(activeModel) && <option value={activeModel}>{activeModel}</option>}
-            {models.map(m => <option key={m} value={m}>{m}</option>)}
+            {activeModel && !models.includes(activeModel) && <option value={activeModel}>{modelLabel(activeModel)}</option>}
+            {models.map(m => <option key={m} value={m}>{modelLabel(m)}</option>)}
           </select>
 
           {/* Contrôles principaux */}
@@ -745,6 +753,17 @@ export default function Home() {
                 Enregistrer
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Titre de la session (auto-généré) en haut de la discussion */}
+        {sessionTitle && messages.length > 0 && (
+          <div style={{
+            flexShrink: 0, padding: "6px 20px", borderBottom: "1px solid var(--border)",
+            background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text)",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {sessionTitle}
           </div>
         )}
 

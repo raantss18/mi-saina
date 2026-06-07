@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import httpx
@@ -78,6 +79,63 @@ async def select_model(body: SelectModel):
     return {"status": "ok", "active_model": body.model}
 
 
+# Modèles populaires d'Ollama (nom, libellé, taille Go approx, note) — local-friendly.
+_SUGGESTIONS = [
+    ("llama3.2:3b", "Llama 3.2 3B", 2.0, "Léger et rapide (Meta)"),
+    ("qwen2.5:3b", "Qwen 2.5 3B", 1.9, "Léger, polyvalent (Qwen)"),
+    ("gemma3:4b", "Gemma 3 4B", 3.3, "Léger (Google)"),
+    ("qwen3:8b", "Qwen 3 8B", 5.2, "Polyvalent — recommandé"),
+    ("deepseek-r1:8b", "DeepSeek R1 8B", 4.9, "Raisonnement"),
+    ("mistral:7b", "Mistral 7B", 4.4, "Généraliste"),
+    ("llama3.1:8b", "Llama 3.1 8B", 4.7, "Généraliste (Meta)"),
+    ("gemma3:12b", "Gemma 3 12B", 8.1, "Qualité (Google)"),
+    ("phi4:14b", "Phi-4 14B", 9.1, "Raisonnement (Microsoft)"),
+    ("gpt-oss:20b", "GPT-OSS 20B", 13.0, "Gros, haute qualité (OpenAI)"),
+]
+
+
+def _hw_budget_gb() -> float:
+    """Budget mémoire pour un modèle : VRAM totale (NVIDIA) sinon ~moitié de la RAM."""
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=3).stdout
+        mb = int(re.findall(r"\d+", out)[0])
+        if mb > 0:
+            return mb / 1024.0
+    except Exception:
+        pass
+    try:
+        with open("/proc/meminfo") as f:
+            kb = int(re.search(r"MemTotal:\s+(\d+)", f.read()).group(1))
+        return (kb / 1024 / 1024) * 0.5
+    except Exception:
+        return 8.0
+
+
+@router.get("/suggestions")
+async def suggestions():
+    """Modèles populaires d'Ollama, marqués selon la compatibilité matérielle."""
+    installed: set[str] = set()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{settings.OLLAMA_BASE_URL}/api/tags")
+            installed = {m["name"] for m in r.json().get("models", [])}
+    except Exception:
+        pass
+    budget = _hw_budget_gb()
+    out = []
+    for name, label, size, note in _SUGGESTIONS:
+        out.append({
+            "name": name, "label": label, "size_gb": size, "note": note,
+            "installed": name in installed,
+            "recommended": size <= budget,   # tient confortablement sur la machine
+        })
+    # Recommandés d'abord, puis par taille croissante.
+    out.sort(key=lambda m: (not m["recommended"], m["size_gb"]))
+    return {"budget_gb": round(budget, 1), "models": out}
+
+
 @router.get("/pull/{model_name:path}")
 async def pull_model(model_name: str):
     """Télécharge ou met à jour un modèle — stream SSE."""
@@ -87,11 +145,15 @@ async def pull_model(model_name: str):
             async with client.stream(
                 "POST",
                 f"{settings.OLLAMA_BASE_URL}/api/pull",
-                json={"name": model_name, "stream": True},
+                json={"model": model_name, "stream": True},
             ) as resp:
-                async for line in resp.aiter_lines():
-                    if line:
-                        yield f"data: {line}\n\n"
+                if resp.status_code != 200:
+                    body = (await resp.aread()).decode(errors="replace")[:200]
+                    yield f"data: {json.dumps({'status': f'Erreur Ollama {resp.status_code}: {body}'})}\n\n"
+                else:
+                    async for line in resp.aiter_lines():
+                        if line:
+                            yield f"data: {line}\n\n"
         yield 'data: {"status":"done"}\n\n'
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
@@ -167,9 +229,11 @@ async def delete_model(model_name: str):
     if model_name == settings.REASONING_MODEL:
         raise HTTPException(400, detail="Impossible de supprimer le modèle actif. Changez d'abord de modèle.")
     async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.delete(
-            f"{settings.OLLAMA_BASE_URL}/api/delete",
-            json={"name": model_name},
+        # httpx.delete() n'accepte pas de corps → on passe par request() ;
+        # l'API Ollama attend la clé "model".
+        resp = await client.request(
+            "DELETE", f"{settings.OLLAMA_BASE_URL}/api/delete",
+            json={"model": model_name},
         )
         if resp.status_code not in (200, 204):
             raise HTTPException(resp.status_code, detail=f"Erreur Ollama: {resp.text}")

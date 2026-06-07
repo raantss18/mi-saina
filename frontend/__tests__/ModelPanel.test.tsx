@@ -105,7 +105,7 @@ describe("ModelPanel — model list", () => {
     mockFetch([{ name: "unknown-model:3b", size_gb: 2.0, modified: "", active: false }]);
     render(<ModelPanel onModelChange={() => {}} />);
     await waitFor(() => {
-      expect(screen.getByText("unknown-model:3b")).toBeInTheDocument();
+      expect(screen.getByText("Unknown-model 3B")).toBeInTheDocument();
     });
   });
 });

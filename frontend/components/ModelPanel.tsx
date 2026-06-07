@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
 import { t } from "../lib/i18n";
+import { modelDesc as desc } from "../lib/models";
 
 interface OllamaModel {
   name: string;
@@ -22,24 +23,11 @@ interface Props {
   onModelChange: (model: string) => void;
 }
 
-const MODEL_DESCRIPTIONS: Record<string, { label: string; tags: string[] }> = {
-  "deepseek-r1:8b":         { label: "DeepSeek R1 8B",          tags: ["raisonnement", "8B"] },
-  "gemma3:12b":             { label: "Gemma 3 12B",              tags: ["Google", "12B"] },
-  "gemma4:26b":             { label: "Gemma 4 26B Vision",       tags: ["Google", "vision", "26B"] },
-  "phi4-reasoning:latest":  { label: "Phi-4 Reasoning+",         tags: ["Microsoft", "14B"] },
-  "gpt-oss:20b":            { label: "Meta GPT OSS 20B",         tags: ["Meta", "20B"] },
-  "magistral:small":        { label: "Magistral Small",          tags: ["Mistral", "24B"] },
-  "qwen3.6:35b":            { label: "Qwen 3.6 35B MoE",         tags: ["Qwen", "MoE", "35B"] },
-  "qwen3.5:9b":             { label: "Qwen 3.5 9B",              tags: ["Qwen", "9B"] },
-  "qwen3:30b-a3b":          { label: "Qwen 3 30B MoE",           tags: ["Qwen", "MoE", "30B"] },
-};
-
-function desc(name: string) {
-  return MODEL_DESCRIPTIONS[name] ?? { label: name, tags: [] };
-}
+interface Suggestion { name: string; label: string; size_gb: number; note: string; installed: boolean; recommended: boolean; }
 
 export default function ModelPanel({ onModelChange }: Props) {
   const [models, setModels] = useState<OllamaModel[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [pullInput, setPullInput] = useState("");
   const [actionModel, setActionModel] = useState<string | null>(null);  // modèle en cours d'action
   const [actionType, setActionType] = useState<"pull" | "update" | "delete" | "import" | null>(null);
@@ -53,11 +41,17 @@ export default function ModelPanel({ onModelChange }: Props) {
     } catch { setError(t("mpNetErr")); }
   }, []);
 
+  const fetchSuggestions = useCallback(() => {
+    fetch(`${API_BASE}/models/suggestions`).then(r => r.json())
+      .then(d => setSuggestions(d.models || [])).catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetchModels();
+    fetchSuggestions();
     const id = setInterval(fetchModels, 8000);
     return () => clearInterval(id);
-  }, [fetchModels]);
+  }, [fetchModels, fetchSuggestions]);
 
   const handleSelect = async (name: string) => {
     await fetch(`${API_BASE}/models/select`, {
@@ -105,6 +99,7 @@ export default function ModelPanel({ onModelChange }: Props) {
             setPullStatus(null);
             if (!isUpdate) setPullInput("");
             fetchModels();
+            fetchSuggestions();
             return;
           }
           const pct = data.total && data.completed ? Math.round((data.completed / data.total) * 100) : undefined;
@@ -294,6 +289,37 @@ export default function ModelPanel({ onModelChange }: Props) {
           {t("mpImportBtn")}
         </button>
       </div>
+
+      {/* Modèles suggérés (populaires sur Ollama, marqués selon la compatibilité) */}
+      {suggestions.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, letterSpacing: 0.5 }}>{t("mpSuggested")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {suggestions.map(s => (
+              <div key={s.name} style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)",
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: "var(--text)" }}>{s.label}</span>
+                    <span style={{ fontSize: 9, color: "var(--text-muted)" }}>{s.size_gb}GB</span>
+                    {s.recommended && <span title={t("mpCompatible")} style={{ fontSize: 9, background: "rgba(127,184,154,0.2)", color: "var(--accent)", borderRadius: 3, padding: "1px 5px" }}>✓ {t("mpCompatible")}</span>}
+                  </div>
+                  <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: 2 }}>{s.note}</div>
+                </div>
+                {s.installed
+                  ? <span style={{ fontSize: 10, color: "var(--green)" }}>✓ {t("mpInstalledTag")}</span>
+                  : <button onClick={() => handlePullOrUpdate(s.name, false)} disabled={busy}
+                      title={t("mpPullTip")}
+                      style={{ background: "var(--border)", border: "none", color: "var(--accent)", padding: "3px 10px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
+                      ↓ {t("mpGet")}
+                    </button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ fontSize: 10, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 8 }}>
         {t("mpLegend")}

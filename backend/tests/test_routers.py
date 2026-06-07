@@ -254,7 +254,7 @@ def test_delete_inactive_model(client, monkeypatch):
         instance = AsyncMock()
         instance.__aenter__ = AsyncMock(return_value=instance)
         instance.__aexit__ = AsyncMock(return_value=False)
-        instance.delete = AsyncMock(return_value=MagicMock(status_code=200))
+        instance.request = AsyncMock(return_value=MagicMock(status_code=200))
         MockClient.return_value = instance
 
         resp = client.delete("/models/delete/inactive-model:7b")
