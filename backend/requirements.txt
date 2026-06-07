@@ -20,6 +20,9 @@ python-docx>=1.1.0
 openpyxl>=3.1.0
 python-pptx>=0.6.23
 
+# Serveur MCP « fetch » (résumé/lecture de pages web) — configuré automatiquement
+mcp-server-fetch>=2025.1.17
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.23.0

@@ -36,7 +36,7 @@ _PROTOCOL_VERSION = "2024-11-05"
 # On tolère les préfixes que les modèles locaux improvisent (FETCH, TOOL, CALL…)
 # pour ne pas rater l'appel ; [EXEC:] et [SEARCH:] restent gérés à part.
 MCP_RE = re.compile(
-    r'\[(?:MCP|FETCH|TOOL|OUTIL|CALL)\s*:\s*([\w.-]+?)\.([\w.-]+?)\s*(\{.*?\})?\s*\]',
+    r'\[(?:MCP|FETCH|TOOL|OUTIL|CALL)\s*:\s*([\w.-]+?)\.([\w.-]+)\s*([^\]]*?)\s*\]',
     re.IGNORECASE | re.DOTALL)
 
 
@@ -244,10 +244,14 @@ def _build_tools_block() -> str:
     # Consignes d'usage ciblées (le modèle local sait mieux quoi déclencher).
     if has_fetch:
         lines.append(
-            "\nQUAND L'UTILISATEUR MENTIONNE UN SITE OU UNE URL (ex. « quoi de neuf "
-            "sur apmep.fr », « résume cette page … ») : récupère son contenu avec "
-            "[MCP: fetch.fetch {\"url\": \"https://…\"}] (ajoute https:// si absent), "
-            "PUIS rédige un résumé. N'utilise [SEARCH: …] que pour une recherche "
+            "\nQUAND L'UTILISATEUR DONNE UN SITE OU UNE URL (ex. « résume "
+            "raantss18.github.io/antsamath ») : récupère SON contenu avec "
+            "[MCP: fetch.fetch {\"url\": \"https://L-URL-EXACTE-DEMANDÉE\"}] — reprends "
+            "l'URL EXACTE de l'utilisateur (ajoute https:// si absent), n'en invente "
+            "pas une autre. Ne résume QUE le contenu réellement renvoyé par ce fetch. "
+            "Si le fetch échoue (erreur, vide), DIS-LE clairement et propose de "
+            "réessayer — n'invente JAMAIS de contenu et ne réutilise PAS un site "
+            "demandé précédemment. N'utilise [SEARCH: …] que pour une recherche "
             "générale sans site précis.")
         lines.append(
             "POUR TÉLÉCHARGER DES FICHIERS depuis un site (ex. « télécharge les "
@@ -267,16 +271,57 @@ def tools_block() -> str:
     return _tools_block
 
 
+def _required_arg(server: str, tool: str) -> str | None:
+    """Nom de l'argument requis d'un outil (depuis son schéma), pour mapper une
+    valeur nue (« https://… ») fournie sans JSON par un petit modèle."""
+    srv = _servers.get(server)
+    if srv:
+        for t in srv.tools:
+            if t.get("name") == tool:
+                schema = t.get("inputSchema") or {}
+                req = schema.get("required") or []
+                if req:
+                    return req[0]
+                props = list((schema.get("properties") or {}).keys())
+                if len(props) == 1:
+                    return props[0]
+    return {"fetch": "url"}.get(tool)   # repli courant
+
+
+def _ensure_scheme(u: str) -> str:
+    u = (u or "").strip()
+    if u and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://", u):
+        return "https://" + u
+    return u
+
+
+def _normalize_quotes(s: str) -> str:
+    return (s.replace("“", '"').replace("”", '"')
+             .replace("‘", "'").replace("’", "'"))
+
+
 def parse_calls(text: str) -> list[tuple[str, str, dict]]:
-    """Extrait les appels [MCP: serveur.outil {json}] → [(serveur, outil, args)]."""
+    """Extrait les appels [MCP: serveur.outil {json}] ou [MCP: fetch.fetch https://…]
+    → [(serveur, outil, args)]. Tolérant : JSON malformé, guillemets typographiques,
+    valeur nue, URL sans schéma (les petits modèles locaux improvisent souvent)."""
     calls = []
-    for srv, tool, raw_args in MCP_RE.findall(text):
-        args = {}
-        if raw_args:
+    for srv, tool, raw in MCP_RE.findall(text):
+        raw = (raw or "").strip()
+        args: dict = {}
+        if raw:
             try:
-                args = json.loads(raw_args)
+                parsed = json.loads(_normalize_quotes(raw))
+                if isinstance(parsed, dict):
+                    args = parsed
             except Exception:
-                args = {}
+                # Pas du JSON → valeur nue mappée sur l'argument requis de l'outil.
+                val = raw.strip().strip("`\"' ")
+                key = _required_arg(srv, tool)
+                if key and val and not val.startswith("{"):
+                    args = {key: val}
+        # URL sans schéma → ajoute https:// (fetch et assimilés).
+        if isinstance(args.get("url"), str):
+            args["url"] = _ensure_scheme(args["url"])
         calls.append((srv, tool, args))
     return calls
 

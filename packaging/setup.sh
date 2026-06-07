@@ -136,8 +136,32 @@ $SUDO "$PREFIX/venv/bin/pip" install --upgrade pip -q
 $SUDO "$PREFIX/venv/bin/pip" install -q -r "$PREFIX/backend/requirements.txt" || \
     $SUDO "$PREFIX/venv/bin/pip" install -q fastapi uvicorn httpx "pydantic>=2" pydantic-settings \
         python-dotenv aiofiles websockets rich sqlalchemy aiosqlite numpy ollama ddgs \
-        pypdf python-docx openpyxl python-pptx
+        pypdf python-docx openpyxl python-pptx mcp-server-fetch
 ok "Dépendances Python installées"
+
+# Outils MCP : serveur « fetch » (lecture/résumé de pages web) auto-configuré.
+mkdir -p "$HOME/.config/mi-saina"
+if [ -x "$PREFIX/venv/bin/mcp-server-fetch" ]; then
+    if [ ! -f "$HOME/.config/mi-saina/mcp.json" ]; then
+        cat > "$HOME/.config/mi-saina/mcp.json" <<MCPEOF
+{
+  "mcpServers": {
+    "fetch": { "command": "$PREFIX/venv/bin/mcp-server-fetch", "args": [], "env": {} }
+  }
+}
+MCPEOF
+    fi
+    python3 - <<'PY' || true
+import json, os
+p = os.path.expanduser("~/.config/mi-saina/settings.json"); d = {}
+try: d = json.load(open(p))
+except Exception: pass
+d["MCP_ENABLED"] = True
+os.makedirs(os.path.dirname(p), exist_ok=True)
+open(p, "w").write(json.dumps(d, indent=2, ensure_ascii=False))
+PY
+    ok "Outils MCP activés (serveur web « fetch »)"
+fi
 
 # ── 6. Intégration bureau (menu Applications + tray au démarrage) ──
 $SUDO tee /usr/share/applications/mi-saina.desktop >/dev/null <<DESKEOF

@@ -282,8 +282,33 @@ info "Installation des dépendances Python…"
 pip install -q \
     fastapi uvicorn httpx "pydantic>=2" pydantic-settings python-dotenv \
     aiofiles websockets rich sqlalchemy aiosqlite numpy ollama duckduckgo-search \
-    pypdf python-docx openpyxl python-pptx
+    pypdf python-docx openpyxl python-pptx mcp-server-fetch
 ok "Dépendances Python installées"
+
+# ── Outils MCP : serveur « fetch » (lecture/résumé de pages web) auto-configuré ──
+MCP_JSON="$HOME/.config/mi-saina/mcp.json"
+mkdir -p "$HOME/.config/mi-saina"
+if [ -x "$VENV_DIR/bin/mcp-server-fetch" ]; then
+    if [ ! -f "$MCP_JSON" ]; then
+        cat > "$MCP_JSON" <<MCPEOF
+{
+  "mcpServers": {
+    "fetch": { "command": "$VENV_DIR/bin/mcp-server-fetch", "args": [], "env": {} }
+  }
+}
+MCPEOF
+    fi
+    python3 - <<'PY' || true
+import json, os
+p = os.path.expanduser("~/.config/mi-saina/settings.json"); d = {}
+try: d = json.load(open(p))
+except Exception: pass
+d["MCP_ENABLED"] = True
+os.makedirs(os.path.dirname(p), exist_ok=True)
+open(p, "w").write(json.dumps(d, indent=2, ensure_ascii=False))
+PY
+    ok "Outils MCP activés (serveur web « fetch » configuré)"
+fi
 
 # ── 7. Dépendances frontend ───────────────────────────────────────
 info "Installation des dépendances frontend (npm)…"
