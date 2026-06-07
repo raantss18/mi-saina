@@ -17,7 +17,7 @@ describe("SearchResults", () => {
 
   it("displays the search query in the header", () => {
     render(<SearchResults results={results} query="Paris weather" onClose={() => {}} />);
-    expect(screen.getByText(/RÉSULTATS: Paris weather/)).toBeInTheDocument();
+    expect(screen.getByText(/RESULTS: Paris weather/)).toBeInTheDocument();
   });
 
   it("renders each result title as a link", () => {

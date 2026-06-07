@@ -1,4 +1,5 @@
 "use client";
+import { t } from "../lib/i18n";
 
 interface SearchResult {
   title: string;
@@ -26,7 +27,7 @@ export default function SearchResults({ results, query, onClose }: Props) {
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
         <span style={{ color: "var(--accent)", fontSize: 10, letterSpacing: 0.5 }}>
-          RÉSULTATS: {query}
+          {t("srResults")} {query}
         </span>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}>✕</button>
       </div>

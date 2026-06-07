@@ -183,7 +183,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
           >
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {s.title || "Session sans titre"}
+                {s.title || t("untitledSession")}
               </div>
               <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
                 {new Date(s.updated_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}

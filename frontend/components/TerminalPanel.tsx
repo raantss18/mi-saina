@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { t } from "../lib/i18n";
 
 export interface ShellEntry {
   command?: string;
@@ -17,11 +18,11 @@ export interface ShellEntry {
 export type TaskStatus = "idle" | "running" | "success" | "failure" | "stopped";
 
 const STATUS_META: Record<TaskStatus, { label: string; color: string; icon: string }> = {
-  idle:    { label: "prêt",            color: "var(--text-muted)", icon: "○" },
-  running: { label: "tâche en cours…", color: "var(--accent)",     icon: "⟳" },
-  success: { label: "terminé · succès", color: "var(--green)",     icon: "✓" },
-  failure: { label: "terminé · échec",  color: "var(--red)",       icon: "✗" },
-  stopped: { label: "arrêté",          color: "var(--yellow)",     icon: "■" },
+  idle:    { label: t("tpReady"),       color: "var(--text-muted)", icon: "○" },
+  running: { label: t("tpRunningTask"), color: "var(--accent)",     icon: "⟳" },
+  success: { label: t("tpDoneOk"),      color: "var(--green)",     icon: "✓" },
+  failure: { label: t("tpDoneFail"),    color: "var(--red)",       icon: "✗" },
+  stopped: { label: t("tpStopped"),     color: "var(--yellow)",     icon: "■" },
 };
 
 export default function TerminalPanel({
@@ -68,7 +69,7 @@ export default function TerminalPanel({
           </span>
           {meta.label}
         </span>
-        <button onClick={onClose} title="Fermer le terminal"
+        <button onClick={onClose} title={t("tpClose")}
           style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14, padding: 0, marginLeft: 6 }}>
           ✕
         </button>
@@ -82,8 +83,8 @@ export default function TerminalPanel({
         {entries.length === 0 && (
           <div className="ms-empty" style={{ fontFamily: "var(--font-ui)" }}>
             <span className="ms-empty-icon">▣</span>
-            <div>Aucune commande exécutée pour l’instant.</div>
-            <div style={{ fontSize: 11, opacity: 0.8 }}>La sortie des commandes apparaîtra ici en temps réel.</div>
+            <div>{t("tpEmpty")}</div>
+            <div style={{ fontSize: 11, opacity: 0.8 }}>{t("tpEmptyHint")}</div>
           </div>
         )}
         {entries.map((e, i) => {
@@ -94,11 +95,11 @@ export default function TerminalPanel({
           const ok = done && !failed;
           const running = e.shellStreaming && !done;
           const color = running ? "var(--accent)" : ok ? "var(--green)" : failed ? "var(--red)" : "var(--text-muted)";
-          const statusLabel = running ? "en cours…"
+          const statusLabel = running ? t("tpRunningShort")
             : !done ? ""
-            : ok ? "succès"
-            : logicalFail ? "échec logique (rc=0)"
-            : `échec (rc=${e.returncode})`;
+            : ok ? t("success")
+            : logicalFail ? t("tpLogicalFail")
+            : `${t("tpDoneFail")} (rc=${e.returncode})`;
           return (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={{ display: "flex", gap: 6, alignItems: "center", color }}>
@@ -137,7 +138,7 @@ export default function TerminalPanel({
             value={inputVal}
             onChange={e => setInputVal(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); send(); } }}
-            placeholder={awaiting ? "Le processus attend une réponse (ex: y, n, Entrée)…" : "Entrée pour le processus…"}
+            placeholder={awaiting ? t("tpWaiting") : t("chEnterProcess")}
             autoFocus={awaiting}
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",

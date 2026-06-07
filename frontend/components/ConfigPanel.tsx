@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
 import { isTauri, isAutostartEnabled, setAutostart } from "../lib/desktop";
-import { getLang, setLang, Lang } from "../lib/i18n";
+import { getLang, setLang, Lang, t } from "../lib/i18n";
 
 interface Skill {
   name: string;
@@ -14,10 +14,10 @@ interface Skill {
 }
 
 const TAB_HINTS: Record<"prompt" | "skills" | "memory" | "settings", string> = {
-  prompt: "Instructions de base envoyées au modèle à chaque conversation",
-  skills: "Raccourcis slash-command réutilisables (ex : /update)",
-  memory: "Contexte global et profil utilisateur injectés automatiquement",
-  settings: "Comportement de l'agent : confirmations, contexte, planificateur…",
+  prompt: t("cfHintPrompt"),
+  skills: t("cfHintSkills"),
+  memory: t("cfHintMemory"),
+  settings: t("cfHintSettings"),
 };
 
 export default function ConfigPanel() {
@@ -108,7 +108,7 @@ export default function ConfigPanel() {
     if (r.ok) {
       const d = await r.json();
       setSetValues(d.values);
-      setSetOk("✓ Enregistré"); setTimeout(() => setSetOk(""), 2000);
+      setSetOk(t("saved")); setTimeout(() => setSetOk(""), 2000);
       // Changement de langue → synchronise l'UI et recharge (i18n par rechargement).
       const lang = d.values?.LANGUAGE as Lang | undefined;
       if (lang && lang !== getLang()) { setLang(lang); window.location.reload(); }
@@ -149,7 +149,7 @@ export default function ConfigPanel() {
   };
 
   const clearRag = async () => {
-    if (!confirm("Vider la base documentaire indexée ?")) return;
+    if (!confirm(t("cfRagClearConfirm"))) return;
     await fetch(`${API_BASE}/rag/clear`, { method: "DELETE" });
     loadRagStatus();
   };
@@ -161,7 +161,7 @@ export default function ConfigPanel() {
     await fetch(`${API_BASE}/config/profile`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: profile }),
     });
-    setMemOk("✓ Enregistré"); setTimeout(() => setMemOk(""), 2000);
+    setMemOk(t("saved")); setTimeout(() => setMemOk(""), 2000);
   };
 
   const fetchSkills = () => {
@@ -205,15 +205,15 @@ export default function ConfigPanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6 }}>
-        {(["prompt", "skills", "memory", "settings"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            title={TAB_HINTS[t]}
+        {(["prompt", "skills", "memory", "settings"] as const).map(tb => (
+          <button key={tb} onClick={() => setTab(tb)}
+            title={TAB_HINTS[tb]}
             style={{
               padding: "4px 14px", borderRadius: 4, cursor: "pointer", fontSize: 11,
-              background: tab === t ? "var(--accent)" : "var(--border)",
-              border: "none", color: tab === t ? "var(--accent-contrast)" : "var(--text)", fontWeight: tab === t ? 700 : 400,
+              background: tab === tb ? "var(--accent)" : "var(--border)",
+              border: "none", color: tab === tb ? "var(--accent-contrast)" : "var(--text)", fontWeight: tab === tb ? 700 : 400,
             }}>
-            {t === "prompt" ? "System Prompt" : t === "skills" ? "Skills" : t === "memory" ? "Mémoire" : "Réglages"}
+            {tb === "prompt" ? t("cfTabPrompt") : tb === "skills" ? t("cfTabSkills") : tb === "memory" ? t("cfTabMemory") : t("cfTabSettings")}
           </button>
         ))}
       </div>
@@ -222,7 +222,7 @@ export default function ConfigPanel() {
       {tab === "prompt" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            Instructions de base envoyées à chaque prompt, pour tous les modèles.
+            {t("cfPromptIntro")}
           </div>
           <textarea
             value={systemPrompt}
@@ -246,15 +246,15 @@ export default function ConfigPanel() {
                 fontSize: 12, fontWeight: 700,
               }}
             >
-              {saving ? "Sauvegarde..." : saveOk ? "✓ Sauvegardé" : "Sauvegarder"}
+              {saving ? t("cfSaving") : saveOk ? t("cfSavedOk") : t("save")}
             </button>
             {isDirty && (
               <button onClick={() => setSystemPrompt(savedPrompt)}
                 style={{ background: "none", border: "1px solid var(--border)", color: "var(--text-muted)", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                Annuler
+                {t("cancel")}
               </button>
             )}
-            {isDirty && <span style={{ fontSize: 10, color: "var(--yellow)" }}>● Modifications non sauvegardées</span>}
+            {isDirty && <span style={{ fontSize: 10, color: "var(--yellow)" }}>{t("cfUnsaved")}</span>}
           </div>
         </div>
       )}
@@ -263,7 +263,7 @@ export default function ConfigPanel() {
       {tab === "skills" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            Skills = raccourcis slash-command. Tapez <code style={{ color: "var(--accent)" }}>/trigger</code> dans le chat pour les invoquer.
+            {t("cfSkillsIntro")} <code style={{ color: "var(--accent)" }}>/trigger</code> {t("cfSkillsIntro2")}
           </div>
 
           {/* Liste des skills */}
@@ -285,7 +285,7 @@ export default function ConfigPanel() {
                 </div>
                 <button onClick={() => setEditSkill(s)}
                   style={{ background: "none", border: "1px solid var(--border)", color: "var(--text-muted)", padding: "2px 8px", borderRadius: 3, cursor: "pointer", fontSize: 10 }}>
-                  Éditer
+                  {t("cfEdit")}
                 </button>
                 <button onClick={() => deleteSkill(s.name)}
                   style={{ background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontSize: 14 }}>
@@ -302,7 +302,7 @@ export default function ConfigPanel() {
               padding: "8px", borderRadius: 6, cursor: "pointer", fontSize: 11, width: "100%",
             }}
           >
-            + Nouveau skill
+            {t("cfNewSkill")}
           </button>
 
           {/* Éditeur de skill */}
@@ -312,13 +312,13 @@ export default function ConfigPanel() {
               padding: 14, display: "flex", flexDirection: "column", gap: 8,
             }}>
               <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>
-                {newSkill ? "Nouveau skill" : `Éditer: ${editSkill.name}`}
+                {newSkill ? t("cfNewSkillTitle") : `${t("cfEditTitle")} ${editSkill.name}`}
               </div>
               {[
-                { key: "icon", label: "Icône", placeholder: "⚡" },
-                { key: "name", label: "Nom", placeholder: "mon-skill" },
-                { key: "trigger", label: "Trigger", placeholder: "/mon-skill" },
-                { key: "description", label: "Description", placeholder: "Ce que fait ce skill" },
+                { key: "icon", label: t("cfIcon"), placeholder: "⚡" },
+                { key: "name", label: t("cfName"), placeholder: "mon-skill" },
+                { key: "trigger", label: t("cfTrigger"), placeholder: "/mon-skill" },
+                { key: "description", label: t("cfDescription"), placeholder: "" },
               ].map(f => (
                 <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <label style={{ fontSize: 10, color: "var(--text-muted)", width: 80, flexShrink: 0 }}>{f.label}</label>
@@ -335,11 +335,11 @@ export default function ConfigPanel() {
                 </div>
               ))}
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                <label style={{ fontSize: 10, color: "var(--text-muted)", width: 80, flexShrink: 0, paddingTop: 6 }}>Prompt</label>
+                <label style={{ fontSize: 10, color: "var(--text-muted)", width: 80, flexShrink: 0, paddingTop: 6 }}>{t("cfPrompt")}</label>
                 <textarea
                   value={editSkill.prompt}
                   onChange={e => setEditSkill({ ...editSkill, prompt: e.target.value })}
-                  placeholder="Instructions envoyées au LLM quand ce skill est invoqué..."
+                  placeholder={t("cfSkillPromptPlaceholder")}
                   rows={4}
                   style={{
                     flex: 1, background: "var(--surface)", border: "1px solid var(--border)",
@@ -371,29 +371,29 @@ export default function ConfigPanel() {
       {tab === "memory" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            Ces notes locales (<code>~/.config/mi-saina/</code>) sont injectées automatiquement dans chaque conversation. Jamais versionnées.
+            {t("cfMemIntro")}
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>Contexte global (context.md)</div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Qui tu es, ta machine, tes habitudes — instructions persistantes.</div>
+            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>{t("cfGlobalCtx")}</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>{t("cfGlobalCtxHint")}</div>
             <textarea value={context} onChange={e => setContext(e.target.value)} rows={6}
-              placeholder="Ex : Je suis prof de maths, mes projets LaTeX sont dans ~/Documents/GitHub, réponds en français concis."
+              placeholder={t("cfCtxPlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: 10, borderRadius: 6, fontSize: 12, fontFamily: "monospace", resize: "vertical", outline: "none", lineHeight: 1.5 }} />
           </div>
 
           <div>
-            <div style={{ fontSize: 11, color: "var(--green)", fontWeight: 700, marginBottom: 4 }}>Profil mémorisé (profile.md)</div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>Préférences apprises automatiquement (via [REMEMBER: …]). Modifiable à la main.</div>
+            <div style={{ fontSize: 11, color: "var(--green)", fontWeight: 700, marginBottom: 4 }}>{t("cfProfile")}</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4 }}>{t("cfProfileHint")}</div>
             <textarea value={profile} onChange={e => setProfile(e.target.value)} rows={6}
-              placeholder="(vide — se remplit quand mi-saina mémorise tes préférences)"
+              placeholder={t("cfProfilePlaceholder")}
               style={{ width: "100%", boxSizing: "border-box", background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: 10, borderRadius: 6, fontSize: 12, fontFamily: "monospace", resize: "vertical", outline: "none", lineHeight: 1.5 }} />
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={saveMemory}
               style={{ background: "var(--accent)", border: "none", color: "var(--accent-contrast)", padding: "6px 16px", borderRadius: 4, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-              Sauvegarder
+              {t("save")}
             </button>
             {memOk && <span style={{ fontSize: 11, color: "var(--green)" }}>{memOk}</span>}
           </div>
@@ -403,24 +403,23 @@ export default function ConfigPanel() {
             marginTop: 6, padding: "10px 12px", background: "var(--bg)",
             border: "1px solid var(--border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8,
           }}>
-            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>📚 Base documentaire (RAG)</div>
+            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>{t("cfRagTitle")}</div>
             <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-              Indexe un dossier (PDF, Word, Excel, PowerPoint, texte). mi-saina pourra répondre à partir de
-              tes documents via <code>[RAG: …]</code>. 100 % local (embeddings {""}<code>nomic-embed-text</code>).
-              {ragStat && <> · <b>{ragStat.files}</b> fichier(s), <b>{ragStat.chunks}</b> extrait(s) indexés.</>}
+              {t("cfRagHint")} <code>[RAG: …]</code>. {t("cfRagLocal")} {""}<code>nomic-embed-text</code>).
+              {ragStat && <> · <b>{ragStat.files}</b> {t("cfRagFiles")}, <b>{ragStat.chunks}</b> {t("cfRagChunks")}</>}
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <input value={ragFolder} onChange={e => setRagFolder(e.target.value)} disabled={ragBusy}
-                placeholder="Chemin d'un dossier, ex: /home/raantss/Documents/Cours"
+                placeholder={t("cfRagFolderPlaceholder")}
                 style={{ flex: 1, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", padding: "5px 8px", borderRadius: 4, fontSize: 11, outline: "none" }} />
               <button onClick={indexRag} disabled={ragBusy || !ragFolder.trim()}
                 style={{ background: ragBusy ? "var(--border)" : "var(--accent)", border: "none", color: ragBusy ? "var(--text-muted)" : "var(--accent-contrast)", padding: "5px 12px", borderRadius: 4, cursor: ragBusy ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
-                {ragBusy ? "Indexation…" : "Indexer"}
+                {ragBusy ? t("cfRagIndexing") : t("cfRagIndex")}
               </button>
               {ragStat && ragStat.chunks > 0 && (
-                <button onClick={clearRag} disabled={ragBusy} title="Vider la base"
+                <button onClick={clearRag} disabled={ragBusy} title={t("cfRagClearTip")}
                   style={{ background: "rgba(248,81,73,0.12)", border: "1px solid var(--red)", color: "var(--red)", padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                  Vider
+                  {t("cfRagClear")}
                 </button>
               )}
             </div>
@@ -435,7 +434,7 @@ export default function ConfigPanel() {
       {tab === "settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-            Appliqués immédiatement et persistés (<code>~/.config/mi-saina/settings.json</code>), sans redémarrage.
+            {t("cfSettingsIntro")}
           </div>
 
           {/* Mise à jour du logiciel */}
@@ -449,28 +448,28 @@ export default function ConfigPanel() {
                 mi-saina {upd?.current ? `v${upd.current}` : ""}
               </span>
               {upd?.update_available
-                ? <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-contrast)", background: "var(--accent)", borderRadius: 12, padding: "2px 8px" }}>maj v{upd.latest} dispo</span>
+                ? <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-contrast)", background: "var(--accent)", borderRadius: 12, padding: "2px 8px" }}>{t("cfUpdAvail")} v{upd.latest}</span>
                 : upd?.latest
-                  ? <span style={{ fontSize: 10, color: "var(--green)" }}>✓ à jour</span>
-                  : <span style={{ fontSize: 10, color: "var(--text-muted)" }}>version en ligne inconnue</span>}
+                  ? <span style={{ fontSize: 10, color: "var(--green)" }}>{t("cfUpToDate")}</span>
+                  : <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t("cfUpdUnknown")}</span>}
             </div>
             <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-              Source : {upd?.install_type === "run" ? "installeur .run (/opt)" : upd?.install_type === "source" ? "code source (git)" : "—"}.
-              {" "}La mise à jour est appliquée automatiquement.
+              {t("cfUpdSource")} {upd?.install_type === "run" ? t("cfUpdRun") : upd?.install_type === "source" ? t("cfUpdGit") : "—"}.
+              {" "}{t("cfUpdAuto")}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={checkUpdate} disabled={checking || updating}
                 style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                {checking ? "Vérification…" : "↻ Vérifier"}
+                {checking ? t("cfChecking") : t("cfCheck")}
               </button>
               <button onClick={applyUpdate} disabled={updating || !upd?.update_available}
-                title={upd?.update_available ? "Télécharger et installer la mise à jour" : "Aucune mise à jour disponible"}
+                title={upd?.update_available ? t("cfUpdateTip") : t("cfNoUpdateTip")}
                 style={{
                   background: upd?.update_available && !updating ? "var(--accent)" : "var(--border)",
                   border: "none", color: upd?.update_available && !updating ? "var(--accent-contrast)" : "var(--text-muted)",
                   padding: "6px 14px", borderRadius: 4, cursor: upd?.update_available ? "pointer" : "default", fontSize: 11, fontWeight: 700,
                 }}>
-                {updating ? "Mise à jour…" : "⬆ Mettre à jour"}
+                {updating ? t("cfUpdating") : t("cfUpdateBtn")}
               </button>
             </div>
             {updLog.length > 0 && (
@@ -489,19 +488,19 @@ export default function ConfigPanel() {
               border: "1px solid var(--accent)", borderRadius: 6,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <label style={{ fontSize: 11, color: "var(--text)", fontWeight: 700, flex: 1 }}>Lancer au démarrage de la session</label>
+                <label style={{ fontSize: 11, color: "var(--text)", fontWeight: 700, flex: 1 }}>{t("cfAutostart")}</label>
                 <input type="checkbox" checked={autostart}
                   onChange={e => toggleAutostart(e.target.checked)}
                   style={{ width: 16, height: 16, cursor: "pointer", accentColor: "var(--accent)" }} />
               </div>
               <div style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.4 }}>
-                Démarre mi-saina automatiquement (réduit dans la barre système) à l&apos;ouverture de session.
+                {t("cfAutostartHint")}
               </div>
             </div>
           )}
 
           {Object.keys(setSchema).length === 0 && (
-            <div style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: 11 }}>Chargement…</div>
+            <div style={{ color: "var(--text-muted)", fontStyle: "italic", fontSize: 11 }}>{t("cfLoading")}</div>
           )}
 
           {Object.entries(setSchema).map(([key, spec]: [string, any]) => (
@@ -536,7 +535,7 @@ export default function ConfigPanel() {
               </div>
               {spec.help && <div style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.4 }}>{spec.help}</div>}
               {spec.type === "int" && (
-                <div style={{ fontSize: 9, color: "var(--text-muted)" }}>plage : {spec.min}–{spec.max}</div>
+                <div style={{ fontSize: 9, color: "var(--text-muted)" }}>{t("cfRange")} : {spec.min}–{spec.max}</div>
               )}
             </div>
           ))}

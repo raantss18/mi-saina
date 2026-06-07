@@ -5,20 +5,20 @@ import ChatWindow, { Message } from "../components/ChatWindow";
 describe("ChatWindow — empty state", () => {
   it("shows empty-state text when no messages", () => {
     render(<ChatWindow messages={[]} />);
-    expect(screen.getByText("mi-saina prêt")).toBeInTheDocument();
+    expect(screen.getByText("mi-saina ready")).toBeInTheDocument();
   });
 
   it("shows empty-state subtext", () => {
     render(<ChatWindow messages={[]} />);
     expect(
-      screen.getByText(/Commandes exécutées en direct/)
+      screen.getByText(/Commands run live/)
     ).toBeInTheDocument();
   });
 
   it("does not show empty state when messages exist", () => {
     const messages: Message[] = [{ role: "user", content: "Hello" }];
     render(<ChatWindow messages={messages} />);
-    expect(screen.queryByText("mi-saina prêt")).toBeNull();
+    expect(screen.queryByText("mi-saina ready")).toBeNull();
   });
 });
 
@@ -109,7 +109,7 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} />);
-    expect(screen.getByText("succès")).toBeInTheDocument();
+    expect(screen.getByText("success")).toBeInTheDocument();
   });
 
   it("shows failure indicator when returncode is non-zero", () => {
@@ -137,7 +137,7 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} />);
-    expect(screen.getByText("en cours...")).toBeInTheDocument();
+    expect(screen.getByText("running…")).toBeInTheDocument();
   });
 
   it("does NOT render raw terminal output in chat (details live in the Terminal panel)", () => {
@@ -154,7 +154,7 @@ describe("ChatWindow — shell stream blocks", () => {
     // La sortie brute ne doit plus apparaître dans le chat…
     expect(screen.queryByText(/line1/)).toBeNull();
     // …seulement un résumé d'état lisible.
-    expect(screen.getByText(/Commande terminée/)).toBeInTheDocument();
+    expect(screen.getByText(/Command finished/)).toBeInTheDocument();
   });
 
   it("shows a compact failure summary instead of the raw error", () => {
@@ -172,7 +172,7 @@ describe("ChatWindow — shell stream blocks", () => {
     // L'erreur brute n'est plus affichée dans le chat…
     expect(screen.queryByText("Command not found")).toBeNull();
     // …mais un résumé pointant le panneau Terminal l'est.
-    expect(screen.getByText(/Échec/)).toBeInTheDocument();
+    expect(screen.getByText(/Failed/)).toBeInTheDocument();
   });
 
   it("shows interactive input controls when waitingInput is true", () => {
@@ -187,8 +187,8 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} onShellInput={() => {}} />);
-    expect(screen.getByTitle("Répondre Oui")).toBeInTheDocument();
-    expect(screen.getByTitle("Répondre Non")).toBeInTheDocument();
+    expect(screen.getByTitle("Reply Yes")).toBeInTheDocument();
+    expect(screen.getByTitle("Reply No")).toBeInTheDocument();
   });
 
   it("calls onShellInput with 'y' when Y button clicked", () => {
@@ -204,7 +204,7 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} onShellInput={onShellInput} />);
-    fireEvent.click(screen.getByTitle("Répondre Oui"));
+    fireEvent.click(screen.getByTitle("Reply Yes"));
     expect(onShellInput).toHaveBeenCalledWith("y");
   });
 
@@ -221,7 +221,7 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} onShellInput={onShellInput} />);
-    fireEvent.click(screen.getByTitle("Répondre Non"));
+    fireEvent.click(screen.getByTitle("Reply No"));
     expect(onShellInput).toHaveBeenCalledWith("n");
   });
 
@@ -238,7 +238,7 @@ describe("ChatWindow — shell stream blocks", () => {
       },
     ];
     render(<ChatWindow messages={messages} onShellInput={onShellInput} />);
-    fireEvent.click(screen.getByTitle("Envoyer Entrée vide"));
+    fireEvent.click(screen.getByTitle("Send empty Enter"));
     expect(onShellInput).toHaveBeenCalledWith("");
   });
 });

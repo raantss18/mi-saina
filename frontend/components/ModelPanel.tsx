@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
+import { t } from "../lib/i18n";
 
 interface OllamaModel {
   name: string;
@@ -49,7 +50,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     try {
       const res = await fetch(`${API_BASE}/models/list`);
       if (res.ok) setModels(await res.json());
-    } catch { setError("Backend inaccessible"); }
+    } catch { setError(t("mpNetErr")); }
   }, []);
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export default function ModelPanel({ onModelChange }: Props) {
       } else {
         fetchModels();
       }
-    } catch { setError("Erreur réseau"); }
+    } catch { setError(t("mpNetErr")); }
     setActionModel(null);
     setActionType(null);
   };
@@ -90,7 +91,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     setActionModel(modelName);
     setActionType(isUpdate ? "update" : "pull");
     setError("");
-    setPullStatus({ status: isUpdate ? "Vérification des mises à jour..." : "Connexion..." });
+    setPullStatus({ status: isUpdate ? t("cfChecking") : "…" });
 
     try {
       const es = new EventSource(`${API_BASE}/models/pull/${encodeURIComponent(modelName)}`);
@@ -120,7 +121,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     } catch {
       setActionModel(null);
       setActionType(null);
-      setError("Impossible de lancer l'opération");
+      setError(t("mpCantStart"));
     }
   };
 
@@ -128,7 +129,7 @@ export default function ModelPanel({ onModelChange }: Props) {
     setActionModel("LM Studio");
     setActionType("import");
     setError("");
-    setPullStatus({ status: "Recherche des modèles LM Studio…" });
+    setPullStatus({ status: t("mpImportLabel") });
     try {
       const es = new EventSource(`${API_BASE}/models/import-lmstudio`);
       es.onmessage = (e) => {
@@ -150,7 +151,7 @@ export default function ModelPanel({ onModelChange }: Props) {
       };
     } catch {
       setActionModel(null); setActionType(null);
-      setError("Import LM Studio impossible");
+      setError(t("mpImportErr"));
     }
   };
 
@@ -159,9 +160,9 @@ export default function ModelPanel({ onModelChange }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>MODÈLES OLLAMA</div>
+        <div style={{ color: "var(--accent)", fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>{t("mpHeader")}</div>
         <button onClick={fetchModels} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 11 }}>
-          ↻ rafraîchir
+          {t("mpRefresh")}
         </button>
       </div>
 
@@ -169,7 +170,7 @@ export default function ModelPanel({ onModelChange }: Props) {
       {pullStatus && (
         <div style={{ background: "var(--bg)", border: "1px solid var(--accent)", borderRadius: 6, padding: "8px 12px" }}>
           <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
-            {actionType === "update" ? "↻ Mise à jour" : actionType === "import" ? "⇪ Import LM Studio" : "↓ Téléchargement"} : <code style={{ color: "var(--accent)" }}>{actionModel}</code>
+            {actionType === "update" ? t("mpUpdating") : actionType === "import" ? t("mpImportLabel") : t("mpDownloading")} : <code style={{ color: "var(--accent)" }}>{actionModel}</code>
           </div>
           <div style={{ fontSize: 11, color: "var(--text)" }}>
             {pullStatus.status}{pullStatus.percent !== undefined && ` — ${pullStatus.percent}%`}
@@ -187,7 +188,7 @@ export default function ModelPanel({ onModelChange }: Props) {
         {models.length === 0 && (
           <div className="ms-empty">
             <span className="ms-empty-icon" style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⟳</span>
-            Chargement des modèles…
+            {t("mpLoading")}
           </div>
         )}
         {models.map(m => {
@@ -209,7 +210,7 @@ export default function ModelPanel({ onModelChange }: Props) {
                   <span style={{ fontSize: 12, color: isActive ? "var(--accent)" : "var(--text)", fontWeight: isActive ? 700 : 400 }}>
                     {d.label}
                   </span>
-                  {isActive && <span style={{ fontSize: 9, background: "var(--accent)", color: "var(--accent-contrast)", borderRadius: 3, padding: "1px 5px" }}>ACTIF</span>}
+                  {isActive && <span style={{ fontSize: 9, background: "var(--accent)", color: "var(--accent-contrast)", borderRadius: 3, padding: "1px 5px" }}>{t("mpActive")}</span>}
                   <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: "auto" }}>{m.size_gb}GB</span>
                 </div>
                 <div style={{ display: "flex", gap: 3, marginTop: 3, flexWrap: "wrap" }}>
@@ -223,22 +224,22 @@ export default function ModelPanel({ onModelChange }: Props) {
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                 {!isActive && (
                   <button onClick={() => handleSelect(m.name)} disabled={busy}
-                    title="Utiliser ce modèle pour les réponses"
+                    title={t("mpActivateTip")}
                     style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}>
-                    Activer
+                    {t("mpActivate")}
                   </button>
                 )}
                 <button
                   onClick={() => handlePullOrUpdate(m.name, true)}
                   disabled={busy}
-                  title="Vérifier et télécharger les mises à jour"
+                  title={t("mpUpdateTip")}
                   style={{ background: isBusy && actionType === "update" ? "rgba(127,184,154,0.2)" : "var(--border)", border: "none", color: "var(--accent)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}
                 >
                   {isBusy && actionType === "update" ? "..." : "↻"}
                 </button>
                 {!isActive && (
                   <button onClick={() => handleDelete(m.name)} disabled={busy}
-                    title="Supprimer ce modèle"
+                    title={t("mpDeleteTip")}
                     style={{ background: "rgba(248,81,73,0.1)", border: "1px solid rgba(248,81,73,0.3)", color: "var(--red)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}>
                     🗑
                   </button>
@@ -251,13 +252,13 @@ export default function ModelPanel({ onModelChange }: Props) {
 
       {/* Télécharger un nouveau modèle */}
       <div>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, letterSpacing: 0.5 }}>TÉLÉCHARGER DEPUIS OLLAMA HUB</div>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 6, letterSpacing: 0.5 }}>{t("mpDownloadHub")}</div>
         <div style={{ display: "flex", gap: 6 }}>
           <input
             value={pullInput}
             onChange={e => setPullInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !busy && handlePullOrUpdate(pullInput.trim(), false)}
-            placeholder="ex: phi4-mini, llama3.2:3b..."
+            placeholder={t("mpPullPlaceholder")}
             disabled={busy}
             style={{
               flex: 1, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)",
@@ -267,14 +268,14 @@ export default function ModelPanel({ onModelChange }: Props) {
           <button
             onClick={() => handlePullOrUpdate(pullInput.trim(), false)}
             disabled={busy || !pullInput.trim()}
-            title="Télécharger ce modèle depuis Ollama Hub"
+            title={t("mpPullTip")}
             style={{
               background: !busy && pullInput.trim() ? "var(--accent)" : "var(--border)",
               border: "none", color: !busy && pullInput.trim() ? "var(--accent-contrast)" : "var(--text-muted)",
               padding: "6px 12px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600,
             }}
           >
-            ↓ Pull
+            {t("mpDownloading")}
           </button>
         </div>
         {error && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 6 }}>{error}</div>}
@@ -283,19 +284,19 @@ export default function ModelPanel({ onModelChange }: Props) {
         <button
           onClick={importLmStudio}
           disabled={busy}
-          title="Importer dans Ollama tous les modèles GGUF présents dans LM Studio (~/.lmstudio/models)"
+          title={t("mpImportTip")}
           style={{
             marginTop: 8, width: "100%", background: "var(--bg)", border: "1px dashed var(--accent)",
             color: "var(--accent)", padding: "7px", borderRadius: 6, cursor: busy ? "default" : "pointer",
             fontSize: 11, fontWeight: 600,
           }}
         >
-          ⇪ Importer mes modèles LM Studio
+          {t("mpImportBtn")}
         </button>
       </div>
 
       <div style={{ fontSize: 10, color: "var(--text-muted)", borderTop: "1px solid var(--border)", paddingTop: 8 }}>
-        ↻ = vérifier/télécharger les mises à jour • 🗑 = supprimer (libère l'espace disque)
+        {t("mpLegend")}
       </div>
     </div>
   );

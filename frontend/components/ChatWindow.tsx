@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Markdown from "./Markdown";
+import { t } from "../lib/i18n";
 
 export interface Message {
   role: "user" | "assistant" | "shell" | "plan";
@@ -69,11 +71,11 @@ function ShellStreamBlock({
         <code style={{ fontSize: 11, color: "var(--text-muted)", flex: 1 }}>$ {msg.command}</code>
         {done && (
           <span style={{ fontSize: 10, color: ok ? "var(--green)" : "var(--red)" }}>
-            {ok ? "succès" : `rc=${rc}`}
+            {ok ? t("success") : `rc=${rc}`}
           </span>
         )}
         {running && !done && (
-          <span style={{ fontSize: 10, color: "var(--accent)" }}>en cours...</span>
+          <span style={{ fontSize: 10, color: "var(--accent)" }}>{t("tpRunningShort")}</span>
         )}
       </div>
 
@@ -82,9 +84,9 @@ function ShellStreamBlock({
         padding: "6px 12px", fontSize: 11, color: "var(--text-muted)",
         display: "flex", alignItems: "center", gap: 6,
       }}>
-        {running && !done && <span>Exécution en cours… <span style={{ opacity: 0.7 }}>— détails dans ▣ Terminal</span></span>}
-        {ok && <span style={{ color: "var(--green)" }}>✓ Commande terminée</span>}
-        {failed && <span style={{ color: "var(--red)" }}>✗ Échec — voir ▣ Terminal pour le détail</span>}
+        {running && !done && <span>{t("chRunning")} <span style={{ opacity: 0.7 }}>{t("chDetails")}</span></span>}
+        {ok && <span style={{ color: "var(--green)" }}>{t("chDone")}</span>}
+        {failed && <span style={{ color: "var(--red)" }}>{t("chFailed")}</span>}
       </div>
 
       {/* Input interactif */}
@@ -100,7 +102,7 @@ function ShellStreamBlock({
             value={inputVal}
             onChange={e => setInputVal(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); submitInput(); } }}
-            placeholder={msg.waitingInput ? "Répondre au prompt (ex: y, n, Enter)..." : "Entrée pour le processus..."}
+            placeholder={msg.waitingInput ? t("chReplyPrompt") : t("chEnterProcess")}
             autoFocus={msg.waitingInput}
             style={{
               flex: 1, background: "transparent", border: "none", outline: "none",
@@ -118,21 +120,21 @@ function ShellStreamBlock({
           </button>
           <button
             onClick={() => onInput?.("")}
-            title="Envoyer Entrée vide"
+            title={t("chSendEmpty")}
             style={{ background: "var(--border)", border: "none", color: "var(--text-muted)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10 }}
           >
             Enter
           </button>
           <button
             onClick={() => onInput?.("y")}
-            title="Répondre Oui"
+            title={t("chYes")}
             style={{ background: "rgba(63,185,80,0.2)", border: "1px solid var(--green)", color: "var(--green)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}
           >
             Y
           </button>
           <button
             onClick={() => onInput?.("n")}
-            title="Répondre Non"
+            title={t("chNo")}
             style={{ background: "rgba(248,81,73,0.15)", border: "1px solid var(--red)", color: "var(--red)", padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontWeight: 700 }}
           >
             N
@@ -155,9 +157,9 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
       {messages.length === 0 && (
         <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", marginTop: 60 }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>◈</div>
-          <div>mi-saina prêt</div>
+          <div>{t("chReady")}</div>
           <div style={{ fontSize: 11, marginTop: 4, color: "var(--text-muted)" }}>
-            Commandes exécutées en direct — sortie en temps réel, prompts interactifs
+            {t("chReadyHint")}
           </div>
         </div>
       )}
@@ -204,9 +206,13 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
               borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
               background: msg.role === "user" ? "rgba(127,184,154,0.12)" : "var(--surface)",
               border: msg.role === "user" ? "1px solid var(--accent)" : "1px solid var(--border)",
-              fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              fontSize: 13, lineHeight: 1.6, wordBreak: "break-word",
+              // L'utilisateur reste en texte brut (préserve les retours) ; l'assistant en Markdown.
+              ...(msg.role === "user" ? { whiteSpace: "pre-wrap" as const } : {}),
             }}>
-              {msg.content}
+              {msg.role === "assistant"
+                ? <Markdown content={msg.content} />
+                : msg.content}
               {msg.streaming && i === messages.length - 1 && (
                 <span style={{ color: "var(--accent)", animation: "blink 1s step-end infinite" }}>▋</span>
               )}

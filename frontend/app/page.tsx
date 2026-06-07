@@ -52,7 +52,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [activeModel, setActiveModel] = useState<string>("magistral:small");
+  const [activeModel, setActiveModel] = useState<string>("");
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -88,6 +88,14 @@ export default function Home() {
   useEffect(() => {
     fetch(`${API_BASE}/config/skills`)
       .then(r => r.json()).then(setSkills).catch(() => {});
+  }, []);
+
+  // Modèle réellement actif (corrige l'ancien libellé codé en dur).
+  useEffect(() => {
+    fetch(`${API_BASE}/models/list`).then(r => r.json()).then((list) => {
+      const active = Array.isArray(list) ? list.find((m: { active?: boolean }) => m.active) : null;
+      if (active?.name) setActiveModel(active.name);
+    }).catch(() => {});
   }, []);
 
   // Synchronise la langue de l'UI avec le réglage backend (choix fait à l'install).
