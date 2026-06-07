@@ -219,12 +219,19 @@ def test_list_models_returns_list(client):
     assert resp.status_code == 200
 
 
-def test_select_model_updates_settings(client):
+def test_select_model_updates_settings(client, monkeypatch, tmp_path):
+    # Isolation : ne JAMAIS écrire le vrai .env du dépôt depuis les tests.
+    from config import settings
+    monkeypatch.setattr("routers.models._ENV_FILE", str(tmp_path / ".env"))
+    monkeypatch.setattr(settings, "REASONING_MODEL", "before:0b")
+    monkeypatch.setattr(settings, "FAST_MODEL", "before:0b")
+
     resp = client.post("/models/select", json={"model": "my-model:7b"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "ok"
     assert data["active_model"] == "my-model:7b"
+    assert settings.REASONING_MODEL == "my-model:7b"
 
 
 def test_delete_active_model_returns_400(client, monkeypatch):
