@@ -114,6 +114,42 @@ export default function ConfigPanel() {
     }
   };
 
+  // Base documentaire (RAG)
+  const [ragFolder, setRagFolder] = useState("");
+  const [ragStat, setRagStat] = useState<{ files: number; chunks: number } | null>(null);
+  const [ragBusy, setRagBusy] = useState(false);
+  const [ragLog, setRagLog] = useState<string[]>([]);
+
+  const loadRagStatus = async () => {
+    try { const r = await fetch(`${API_BASE}/rag/status`); setRagStat(await r.json()); } catch { /* indispo */ }
+  };
+  useEffect(() => { loadRagStatus(); }, []);
+
+  const indexRag = () => {
+    const folder = ragFolder.trim();
+    if (!folder) return;
+    setRagBusy(true);
+    setRagLog([]);
+    try {
+      const es = new EventSource(`${API_BASE}/rag/index?folder=${encodeURIComponent(folder)}`);
+      es.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.done) { es.close(); setRagBusy(false); loadRagStatus(); return; }
+          if (d.error) { setRagLog(l => [...l, `✗ ${d.error}`]); es.close(); setRagBusy(false); return; }
+          if (d.status) setRagLog(l => [...l.slice(-40), d.status]);
+        } catch {}
+      };
+      es.onerror = () => { es.close(); setRagBusy(false); loadRagStatus(); };
+    } catch { setRagBusy(false); }
+  };
+
+  const clearRag = async () => {
+    if (!confirm("Vider la base documentaire indexée ?")) return;
+    await fetch(`${API_BASE}/rag/clear`, { method: "DELETE" });
+    loadRagStatus();
+  };
+
   const saveMemory = async () => {
     await fetch(`${API_BASE}/config/context`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: context }),
@@ -356,6 +392,37 @@ export default function ConfigPanel() {
               Sauvegarder
             </button>
             {memOk && <span style={{ fontSize: 11, color: "var(--green)" }}>{memOk}</span>}
+          </div>
+
+          {/* Base documentaire (RAG) */}
+          <div style={{
+            marginTop: 6, padding: "10px 12px", background: "var(--bg)",
+            border: "1px solid var(--border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>📚 Base documentaire (RAG)</div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              Indexe un dossier (PDF, Word, Excel, PowerPoint, texte). mi-saina pourra répondre à partir de
+              tes documents via <code>[RAG: …]</code>. 100 % local (embeddings {""}<code>nomic-embed-text</code>).
+              {ragStat && <> · <b>{ragStat.files}</b> fichier(s), <b>{ragStat.chunks}</b> extrait(s) indexés.</>}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={ragFolder} onChange={e => setRagFolder(e.target.value)} disabled={ragBusy}
+                placeholder="Chemin d'un dossier, ex: /home/raantss/Documents/Cours"
+                style={{ flex: 1, background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)", padding: "5px 8px", borderRadius: 4, fontSize: 11, outline: "none" }} />
+              <button onClick={indexRag} disabled={ragBusy || !ragFolder.trim()}
+                style={{ background: ragBusy ? "var(--border)" : "var(--accent)", border: "none", color: ragBusy ? "var(--text-muted)" : "var(--accent-contrast)", padding: "5px 12px", borderRadius: 4, cursor: ragBusy ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
+                {ragBusy ? "Indexation…" : "Indexer"}
+              </button>
+              {ragStat && ragStat.chunks > 0 && (
+                <button onClick={clearRag} disabled={ragBusy} title="Vider la base"
+                  style={{ background: "rgba(248,81,73,0.12)", border: "1px solid var(--red)", color: "var(--red)", padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+                  Vider
+                </button>
+              )}
+            </div>
+            {ragLog.length > 0 && (
+              <pre style={{ margin: 0, maxHeight: 140, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>{ragLog.join("\n")}</pre>
+            )}
           </div>
         </div>
       )}

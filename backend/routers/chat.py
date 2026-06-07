@@ -15,7 +15,7 @@ from services.memory import (
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
-from services import diagnostics, userctx, mcp_client, documents
+from services import diagnostics, userctx, mcp_client, documents, rag
 from services.sysinfo import system_block
 from services.web_search import search_web
 
@@ -25,6 +25,7 @@ EXEC_RE = re.compile(r'\[EXEC:\s*(.*?)\]', re.DOTALL)
 SEARCH_RE = re.compile(r'\[SEARCH:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
 READ_RE = re.compile(r'\[READ:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
+RAG_RE = re.compile(r'\[RAG:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 
@@ -38,6 +39,18 @@ def _load_system_prompt() -> str:
     ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
     if ctx:
         parts.append(ctx)
+    # Base documentaire (RAG) : rappel DYNAMIQUE seulement si un corpus est indexé,
+    # pour que le modèle sache que [RAG: …] est réellement disponible maintenant.
+    try:
+        rstat = rag.status()
+        if rstat.get("chunks"):
+            parts.append(
+                f"## BASE DOCUMENTAIRE ACTIVE\n{rstat['files']} document(s) de l'utilisateur sont "
+                f"indexés ({rstat['chunks']} extraits). Pour répondre à partir de SES documents, "
+                f"utilise la directive [RAG: ta requête] (mots-clés ou question) — c'est disponible."
+            )
+    except Exception:
+        pass
     if settings.MCP_ENABLED:           # outils externes MCP (si configurés)
         mcp_block = mcp_client.tools_block()
         if mcp_block:
@@ -523,7 +536,8 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
         mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
         searches = [q.strip() for q in SEARCH_RE.findall(full_response) if q.strip()]
         reads = [r.strip() for r in READ_RE.findall(full_response) if r.strip()]
-        if not cmds and not mcp_calls and not searches and not reads:
+        rags = [r.strip() for r in RAG_RE.findall(full_response) if r.strip()]
+        if not cmds and not mcp_calls and not searches and not reads and not rags:
             # Pas d'action : si l'utilisateur a redirigé pendant la réponse, on continue
             redirects = _drain_redirects(queue)
             if redirects:
@@ -574,6 +588,24 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 }))
                 content = text if not err else f"[ERREUR] {err}"
                 results.append((label, f"[Contenu de {path}]\n{content}", rc))
+
+        # ── Recherche dans la base documentaire [RAG: question] ────────────
+        if not stopped:
+            for q in rags:
+                label = f"RAG {q}"
+                await websocket.send_text(json.dumps({"type": "shell_start", "command": label}))
+                hits = await rag.search(q, top_k=5)
+                if hits:
+                    body = "\n\n".join(
+                        f"[Extrait {i + 1} — {h['path']} (score {h['score']:.2f})]\n{h['content']}"
+                        for i, h in enumerate(hits))
+                else:
+                    body = "(aucun document indexé ne correspond — propose à l'utilisateur d'indexer un dossier dans ⚙ Config → Mémoire)"
+                await websocket.send_text(json.dumps({
+                    "type": "shell_done", "command": label, "returncode": 0,
+                    "status": "success", "logical_failure": False, "status_reason": None,
+                }))
+                results.append((label, f"[Base documentaire — résultats pour « {q} »]\n{body}", 0))
 
         # ── Appels d'outils MCP (après les commandes shell) ────────────────
         if not stopped:
@@ -672,6 +704,22 @@ async def chat_ws(websocket: WebSocket):
                 is_new_session = session_message_count(session_id) == 0
 
             memory_context = await build_context_prefix(user_input)
+            # Auto-RAG : si un corpus est indexé et que la question lui correspond
+            # (similarité suffisante), on injecte les extraits pertinents directement
+            # — fiable même si le petit modèle local n'émet pas [RAG: …] lui-même.
+            try:
+                if rag.status().get("chunks"):
+                    hits = await rag.search(user_input, top_k=4)
+                    hits = [h for h in hits if h["score"] >= 0.55]
+                    if hits:
+                        extracts = "\n\n".join(
+                            f"[{h['path']} (score {h['score']:.2f})]\n{h['content']}" for h in hits)
+                        block = ("## EXTRAITS DE LA BASE DOCUMENTAIRE (pertinents pour la question)\n"
+                                 "Appuie ta réponse sur ces extraits des documents de l'utilisateur "
+                                 "et cite les fichiers source.\n\n" + extracts)
+                        memory_context = (memory_context + "\n\n" + block) if memory_context else block
+            except Exception:
+                pass
             history = get_session_messages(session_id)
             await add_message(session_id, "user", user_input)
 

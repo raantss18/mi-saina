@@ -6,10 +6,10 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import (chat, shell, search, memory as memory_router,
-                     models as models_router, config_router, schedule, update)
+                     models as models_router, config_router, schedule, update, rag)
 from services.scheduler import scheduler_loop
 
-app = FastAPI(title="mi-saina API", version="1.0.2")
+app = FastAPI(title="mi-saina API", version="1.0.3")
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -52,6 +52,7 @@ app.include_router(models_router.router, prefix="/models")
 app.include_router(config_router.router, prefix="/config")
 app.include_router(schedule.router, prefix="/schedule")
 app.include_router(update.router, prefix="/update")
+app.include_router(rag.router, prefix="/rag")
 
 
 @app.get("/health")
