@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ChatWindow from "../components/ChatWindow";
 import ConfigPanel from "../components/ConfigPanel";
 import MemoryPanel from "../components/MemoryPanel";
-import ModelPanel from "../components/ModelPanel";
 import SearchResults from "../components/SearchResults";
 import TerminalPanel, { TaskStatus } from "../components/TerminalPanel";
 import SchedulePanel from "../components/SchedulePanel";
@@ -46,13 +45,14 @@ const DOC_EXTS = ["pdf", "docx", "xlsx", "pptx"];
 interface SearchResult { title: string; url: string; snippet: string; }
 interface Skill { name: string; trigger: string; description: string; icon: string; prompt: string; }
 
-type Panel = "models" | "config" | "schedule" | null;
+type Panel = "config" | "schedule" | null;
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [activeModel, setActiveModel] = useState<string>("");
+  const [models, setModels] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -90,13 +90,26 @@ export default function Home() {
       .then(r => r.json()).then(setSkills).catch(() => {});
   }, []);
 
-  // Modèle réellement actif (corrige l'ancien libellé codé en dur).
-  useEffect(() => {
+  // Liste des modèles + modèle réellement actif (pour le sélecteur du header).
+  const refreshModels = useCallback(() => {
     fetch(`${API_BASE}/models/list`).then(r => r.json()).then((list) => {
-      const active = Array.isArray(list) ? list.find((m: { active?: boolean }) => m.active) : null;
+      if (!Array.isArray(list)) return;
+      setModels(list.map((m: { name: string }) => m.name));
+      const active = list.find((m: { active?: boolean }) => m.active);
       if (active?.name) setActiveModel(active.name);
     }).catch(() => {});
   }, []);
+  useEffect(() => { refreshModels(); }, [refreshModels]);
+
+  // Changement de modèle depuis le dropdown du header.
+  const switchModel = (name: string) => {
+    if (!name || name === activeModel) return;
+    setActiveModel(name);
+    fetch(`${API_BASE}/models/select`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: name }),
+    }).catch(() => {});
+  };
 
   // Synchronise la langue de l'UI avec le réglage backend (choix fait à l'install).
   useEffect(() => {
@@ -575,7 +588,7 @@ export default function Home() {
     { id: "artifacts", icon: "❖", label: t("cmdArtifacts"), run: () => setShowArtifacts(v => !v) },
     { id: "pin", icon: "📌", label: t("cmdPinResp"), run: pinLastResponse },
     { id: "sidebar", icon: "☰", label: t("cmdSidebar"), hint: "Ctrl/⌘ B", run: toggleSidebar },
-    { id: "panel-models", icon: "⬡", label: t("cmdOpenModels"), keywords: "modele model modely", run: () => setPanel("models") },
+    { id: "panel-models", icon: "⬡", label: t("cmdOpenModels"), keywords: "modele model modely", run: () => setPanel("config") },
     { id: "panel-config", icon: "⚙", label: t("cmdOpenConfig"), keywords: "reglages settings", run: () => setPanel("config") },
     { id: "panel-schedule", icon: "⏰", label: t("cmdOpenTasks"), keywords: "schedule cron asa", run: () => setPanel("schedule") },
     ...skills.map((s): Command => ({
@@ -600,8 +613,6 @@ export default function Home() {
           onSelectSession={(id) => { loadSession(id); setPanel(null); }}
           onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); }}
           refreshKey={memoryRefresh}
-          activePanel={panel}
-          onNavigate={setPanel}
         />
       )}
 
@@ -618,25 +629,28 @@ export default function Home() {
             style={{ ...btnStyle(), padding: "4px 8px", fontSize: 14 }}>
             ☰
           </button>
+          {/* Sélecteur de modèle (liste déroulante) */}
           <span style={{ color: "var(--text-muted)", fontSize: 10 }}>{t("model")}</span>
-          <span title={t("modelActiveTip")}
-            style={{ background: "var(--border)", padding: "2px 8px", borderRadius: 12, fontSize: 11, color: "var(--accent)" }}>
-            {activeModel}
-          </span>
+          <select
+            value={activeModel}
+            onChange={(e) => switchModel(e.target.value)}
+            title={t("selectModelTip")}
+            style={{
+              background: "var(--border)", border: "1px solid var(--border-strong)",
+              color: "var(--accent)", padding: "3px 8px", borderRadius: 12, fontSize: 11,
+              cursor: "pointer", outline: "none", maxWidth: 220,
+            }}>
+            {activeModel && !models.includes(activeModel) && <option value={activeModel}>{activeModel}</option>}
+            {models.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
 
           {/* Contrôles principaux */}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-            {/* Re-run */}
-            <button onClick={rerunLast} disabled={!lastUserMsg || streaming} title={t("rerun")} style={btnStyle()}>
-              ↺
+            <button onClick={() => setPanel(p => p === "config" ? null : "config")} title={t("navConfig")} style={btnStyle(panel === "config")}>
+              ⚙ {t("navConfig")}
             </button>
-            {/* Copy */}
-            <button onClick={copyLastResponse} title={t("copyResp")} style={btnStyle()}>
-              ⎘
-            </button>
-            {/* Clear */}
-            <button onClick={clearChat} title={t("clearChat")} style={btnStyle(false, true)}>
-              🗑
+            <button onClick={() => setPanel(p => p === "schedule" ? null : "schedule")} title={t("navTasks")} style={btnStyle(panel === "schedule")}>
+              ⏰ {t("navTasks")}
             </button>
             <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
             <button onClick={() => setShowTerminal(v => !v)} title={t("terminalTip")} style={btnStyle(showTerminal)}>
@@ -669,8 +683,7 @@ export default function Home() {
         {/* Zone centrale : panneau plein écran OU chat */}
         {panel ? (
           <div style={{ flex: 1, minHeight: 0, padding: "16px 22px", overflowY: "auto", background: "var(--bg)" }}>
-            {panel === "models" && <ModelPanel onModelChange={(m) => { setActiveModel(m); setPanel(null); }} />}
-            {panel === "config" && <ConfigPanel />}
+            {panel === "config" && <ConfigPanel onModelChange={(m) => { setActiveModel(m); refreshModels(); }} />}
             {panel === "schedule" && <SchedulePanel onOpenSession={(id) => { loadSession(id); setPanel(null); }} />}
           </div>
         ) : (

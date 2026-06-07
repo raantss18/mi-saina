@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
 import { isTauri, isAutostartEnabled, setAutostart } from "../lib/desktop";
 import { getLang, setLang, Lang, t } from "../lib/i18n";
+import ModelPanel from "./ModelPanel";
 
 interface Skill {
   name: string;
@@ -13,18 +14,21 @@ interface Skill {
   prompt: string;
 }
 
-const TAB_HINTS: Record<"prompt" | "skills" | "memory" | "settings", string> = {
+type CfTab = "prompt" | "skills" | "memory" | "models" | "settings";
+
+const TAB_HINTS: Record<CfTab, string> = {
   prompt: t("cfHintPrompt"),
   skills: t("cfHintSkills"),
   memory: t("cfHintMemory"),
+  models: t("cfHintModels"),
   settings: t("cfHintSettings"),
 };
 
-export default function ConfigPanel() {
+export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: string) => void } = {}) {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [savedPrompt, setSavedPrompt] = useState("");
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [tab, setTab] = useState<"prompt" | "skills" | "memory" | "settings">("prompt");
+  const [tab, setTab] = useState<CfTab>("prompt");
   const [context, setContext] = useState("");
   const [profile, setProfile] = useState("");
   const [memOk, setMemOk] = useState("");
@@ -205,7 +209,7 @@ export default function ConfigPanel() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6 }}>
-        {(["prompt", "skills", "memory", "settings"] as const).map(tb => (
+        {(["prompt", "skills", "memory", "models", "settings"] as const).map(tb => (
           <button key={tb} onClick={() => setTab(tb)}
             title={TAB_HINTS[tb]}
             style={{
@@ -213,7 +217,7 @@ export default function ConfigPanel() {
               background: tab === tb ? "var(--accent)" : "var(--border)",
               border: "none", color: tab === tb ? "var(--accent-contrast)" : "var(--text)", fontWeight: tab === tb ? 700 : 400,
             }}>
-            {tb === "prompt" ? t("cfTabPrompt") : tb === "skills" ? t("cfTabSkills") : tb === "memory" ? t("cfTabMemory") : t("cfTabSettings")}
+            {tb === "prompt" ? t("cfTabPrompt") : tb === "skills" ? t("cfTabSkills") : tb === "memory" ? t("cfTabMemory") : tb === "models" ? t("navModels") : t("cfTabSettings")}
           </button>
         ))}
       </div>
@@ -428,6 +432,11 @@ export default function ConfigPanel() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modèles : gestion avancée (télécharger / mettre à jour / supprimer / importer) */}
+      {tab === "models" && (
+        <ModelPanel onModelChange={(m) => onModelChange?.(m)} />
       )}
 
       {/* Réglages : comportement de l'agent (appliqués à chaud, persistés) */}
