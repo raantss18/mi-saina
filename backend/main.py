@@ -9,7 +9,7 @@ from routers import (chat, shell, search, memory as memory_router,
                      models as models_router, config_router, schedule, update)
 from services.scheduler import scheduler_loop
 
-app = FastAPI(title="mi-saina API", version="1.0.1")
+app = FastAPI(title="mi-saina API", version="1.0.2")
 
 
 def _origin_allowed(origin: str | None) -> bool:

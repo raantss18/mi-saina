@@ -15,7 +15,7 @@ from services.memory import (
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
-from services import diagnostics, userctx, mcp_client
+from services import diagnostics, userctx, mcp_client, documents
 from services.sysinfo import system_block
 from services.web_search import search_web
 
@@ -24,6 +24,7 @@ router = APIRouter()
 EXEC_RE = re.compile(r'\[EXEC:\s*(.*?)\]', re.DOTALL)
 SEARCH_RE = re.compile(r'\[SEARCH:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
+READ_RE = re.compile(r'\[READ:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 
@@ -52,10 +53,16 @@ def _build_messages(history, user_input, memory_context, attachments=None):
     msgs += history
     if attachments:
         images = [a["data"] for a in attachments if a.get("type") == "image"]
-        text_parts = [
-            f"[Fichier: {a['name']}]\n```\n{a['content']}\n```"
-            for a in attachments if a.get("type") == "text"
-        ]
+        text_parts = []
+        for a in attachments:
+            kind = a.get("type")
+            if kind == "text":
+                text_parts.append(f"[Fichier: {a['name']}]\n```\n{a['content']}\n```")
+            elif kind == "document":
+                # Document binaire (PDF/Word/Excel/PowerPoint) → texte extrait côté serveur.
+                txt, err = documents.extract_from_base64(a.get("data", ""), a["name"])
+                body = txt if not err else f"[ERREUR] {err}"
+                text_parts.append(f"[Document: {a['name']}]\n```\n{body}\n```")
         content = ("\n\n".join(text_parts) + "\n\n" + user_input).strip() if text_parts else user_input
         msg: dict = {"role": "user", "content": content}
         if images:
@@ -515,7 +522,8 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
         cmds = [c.strip() for c in EXEC_RE.findall(full_response) if c.strip()]
         mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
         searches = [q.strip() for q in SEARCH_RE.findall(full_response) if q.strip()]
-        if not cmds and not mcp_calls and not searches:
+        reads = [r.strip() for r in READ_RE.findall(full_response) if r.strip()]
+        if not cmds and not mcp_calls and not searches and not reads:
             # Pas d'action : si l'utilisateur a redirigé pendant la réponse, on continue
             redirects = _drain_redirects(queue)
             if redirects:
@@ -551,6 +559,21 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
         if not stopped:
             for q in searches:
                 results.append(await _run_search(q, websocket))
+
+        # ── Lecture de documents [READ: chemin] (PDF, Word, Excel, PowerPoint…) ──
+        if not stopped:
+            for path in reads:
+                label = f"READ {path}"
+                await websocket.send_text(json.dumps({"type": "shell_start", "command": label}))
+                text, err = await asyncio.to_thread(documents.extract_text, path)
+                rc = 0 if not err else 1
+                await websocket.send_text(json.dumps({
+                    "type": "shell_done", "command": label, "returncode": rc,
+                    "status": "success" if rc == 0 else "failure",
+                    "logical_failure": False, "status_reason": None,
+                }))
+                content = text if not err else f"[ERREUR] {err}"
+                results.append((label, f"[Contenu de {path}]\n{content}", rc))
 
         # ── Appels d'outils MCP (après les commandes shell) ────────────────
         if not stopped:

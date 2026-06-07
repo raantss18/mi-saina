@@ -261,7 +261,8 @@ pip install --upgrade pip -q
 info "Installation des dépendances Python…"
 pip install -q \
     fastapi uvicorn httpx "pydantic>=2" pydantic-settings python-dotenv \
-    aiofiles websockets rich sqlalchemy aiosqlite numpy ollama duckduckgo-search
+    aiofiles websockets rich sqlalchemy aiosqlite numpy ollama duckduckgo-search \
+    pypdf python-docx openpyxl python-pptx
 ok "Dépendances Python installées"
 
 # ── 7. Dépendances frontend ───────────────────────────────────────

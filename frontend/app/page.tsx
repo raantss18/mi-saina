@@ -32,11 +32,14 @@ interface Message {
 }
 
 interface Attachment {
-  type: "text" | "image";
+  type: "text" | "image" | "document";
   name: string;
   content?: string;
   data?: string;
 }
+
+// Documents binaires extraits côté serveur (texte récupéré du contenu).
+const DOC_EXTS = ["pdf", "docx", "xlsx", "pptx"];
 
 interface SearchResult { title: string; url: string; snippet: string; }
 interface Skill { name: string; trigger: string; description: string; icon: string; prompt: string; }
@@ -440,15 +443,19 @@ export default function Home() {
     const files = Array.from(e.target.files || []);
     const newAttachments: Attachment[] = [];
 
+    const toBase64 = (file: File) => new Promise<string>((res) => {
+      const reader = new FileReader();
+      reader.onload = () => res((reader.result as string).split(",")[1]);
+      reader.readAsDataURL(file);
+    });
+
     for (const file of files) {
-      const isImage = file.type.startsWith("image/");
-      if (isImage) {
-        const data = await new Promise<string>((res) => {
-          const reader = new FileReader();
-          reader.onload = () => res((reader.result as string).split(",")[1]);
-          reader.readAsDataURL(file);
-        });
-        newAttachments.push({ type: "image", name: file.name, data });
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      if (file.type.startsWith("image/")) {
+        newAttachments.push({ type: "image", name: file.name, data: await toBase64(file) });
+      } else if (DOC_EXTS.includes(ext)) {
+        // PDF/Word/Excel/PowerPoint → envoyés en base64, texte extrait côté serveur.
+        newAttachments.push({ type: "document", name: file.name, data: await toBase64(file) });
       } else {
         const content = await file.text();
         newAttachments.push({ type: "text", name: file.name, content });

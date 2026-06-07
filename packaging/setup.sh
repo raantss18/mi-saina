@@ -115,7 +115,8 @@ $SUDO python3 -m venv "$PREFIX/venv"
 $SUDO "$PREFIX/venv/bin/pip" install --upgrade pip -q
 $SUDO "$PREFIX/venv/bin/pip" install -q -r "$PREFIX/backend/requirements.txt" || \
     $SUDO "$PREFIX/venv/bin/pip" install -q fastapi uvicorn httpx "pydantic>=2" pydantic-settings \
-        python-dotenv aiofiles websockets rich sqlalchemy aiosqlite numpy ollama ddgs
+        python-dotenv aiofiles websockets rich sqlalchemy aiosqlite numpy ollama ddgs \
+        pypdf python-docx openpyxl python-pptx
 ok "Dépendances Python installées"
 
 # ── 6. Intégration bureau (menu Applications + tray au démarrage) ──

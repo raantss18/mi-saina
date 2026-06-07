@@ -16,6 +16,7 @@
 - **Shell interactif en temps réel** — vraies commandes, sortie en direct, prompts `[Y/n]` interactifs, mot de passe sudo géré en sécurité.
 - **Agent multi-étapes** — le modèle enchaîne commande → résultat → commande suivante pour accomplir une tâche.
 - **Adaptation automatique à ta distro et ton matériel** — les commandes de mise à jour/installation sont toujours correctes pour TON système.
+- **Lecture de documents** — résume/analyse des **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV** et fichiers texte/code (joins-les, ou demande « résume ce PDF : … » → directive `[READ: chemin]`).
 - **Mémoire** — recherche sémantique + plein-texte de l'historique, profil utilisateur persistant, fichiers de contexte de projet.
 - **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
 - **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
