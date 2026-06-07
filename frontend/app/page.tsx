@@ -740,7 +740,16 @@ export default function Home() {
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {messages.length === 0
               ? <WelcomeScreen onPick={pickExample} />
-              : <ChatWindow messages={messages} onShellInput={sendShellInput} />}
+              : <ChatWindow messages={messages} onShellInput={sendShellInput}
+                  onDelete={(i) => setMessages(prev => prev.filter((_, j) => j !== i))}
+                  onRegenerate={(i) => {
+                    let pu = i;
+                    while (pu >= 0 && messages[pu].role !== "user") pu--;
+                    if (pu < 0) return;
+                    const content = messages[pu].content;
+                    setMessages(prev => prev.slice(0, pu));
+                    setTimeout(() => sendMessage(content), 0);
+                  }} />}
           </div>
           {showTerminal && (
             <TerminalPanel

@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -139,10 +139,21 @@ def session_message_count(session_id: str) -> int:
         return db.query(Message).filter_by(session_id=session_id).count()
 
 
+def _utc_iso(dt) -> str:
+    """ISO 8601 marqué UTC. Les dates sont stockées en UTC naïf (utcnow) ; sans
+    marqueur de fuseau, le navigateur les lisait comme heure LOCALE → décalage de
+    plusieurs heures. On les marque UTC pour que `new Date()` convertisse bien."""
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
 def list_sessions() -> list[dict]:
     with Session(engine) as db:
         rows = db.query(ChatSession).order_by(ChatSession.updated_at.desc()).all()
-        return [{"id": s.id, "title": s.title, "updated_at": s.updated_at.isoformat()} for s in rows]
+        return [{"id": s.id, "title": s.title, "updated_at": _utc_iso(s.updated_at)} for s in rows]
 
 
 def get_session_messages(session_id: str) -> list[dict]:
@@ -211,12 +222,18 @@ async def search_memory(query: str, top_k: int = 5) -> list[dict]:
         return scored[:top_k]
 
 
-async def build_context_prefix(query: str) -> str:
-    results = await search_memory(query, top_k=4)
+async def build_context_prefix(query: str, min_score: float = 0.62) -> str:
+    """Injecte des extraits de mémoire SEULEMENT s'ils sont vraiment proches de la
+    demande (seuil de similarité). Sans seuil, on injectait toujours les 4 messages
+    « les moins éloignés » même hors sujet → le petit modèle les prenait pour la
+    tâche en cours (réponses hors sujet / contexte qui « bave »)."""
+    results = await search_memory(query, top_k=3)
+    results = [r for r in results if r.get("score", 0) >= min_score]
     if not results:
         return ""
-    lines = ["[MÉMOIRE PERTINENTE — extraits de conversations précédentes]"]
+    lines = ["[NOTES DE MÉMOIRE — extraits de conversations PASSÉES, éventuellement utiles. "
+             "NE réponds PAS à ces anciens messages ; traite UNIQUEMENT la demande actuelle.]"]
     for r in results:
-        lines.append(f"- [{r['role']}] {r['content'][:300]}")
-    lines.append("[FIN MÉMOIRE]")
+        lines.append(f"- [{r['role']}] {r['content'][:240]}")
+    lines.append("[FIN NOTES]")
     return "\n".join(lines)

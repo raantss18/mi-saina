@@ -22,6 +22,43 @@ export interface Message {
 interface Props {
   messages: Message[];
   onShellInput?: (text: string) => void;
+  onRegenerate?: (index: number) => void;
+  onDelete?: (index: number) => void;
+}
+
+// Sépare le raisonnement <think>…</think> de la réponse (rendu en menu déroulant).
+function splitThinking(text: string): { thinking: string; answer: string; thinking_streaming: boolean } {
+  const open = text.indexOf("<think>");
+  if (open === -1) return { thinking: "", answer: text, thinking_streaming: false };
+  const close = text.indexOf("</think>", open);
+  if (close === -1) {
+    return { thinking: text.slice(open + 7), answer: text.slice(0, open), thinking_streaming: true };
+  }
+  return {
+    thinking: text.slice(open + 7, close).trim(),
+    answer: (text.slice(0, open) + text.slice(close + 8)),
+    thinking_streaming: false,
+  };
+}
+
+// Boutons d'action sous un message (copier / régénérer / supprimer).
+function MsgActions({ onCopy, onRegen, onDelete, align }: {
+  onCopy: () => void; onRegen?: () => void; onDelete?: () => void; align: "flex-start" | "flex-end";
+}) {
+  const [copied, setCopied] = useState(false);
+  const btn: React.CSSProperties = {
+    background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer",
+    fontSize: 11, padding: "2px 4px", borderRadius: 4,
+  };
+  return (
+    <div className="ms-msg-actions" style={{ display: "flex", gap: 2, marginTop: 2, justifyContent: align }}>
+      <button style={btn} title={t("msgCopy")} onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>
+        {copied ? "✓" : "⎘"}
+      </button>
+      {onRegen && <button style={btn} title={t("msgRegen")} onClick={onRegen}>↺</button>}
+      {onDelete && <button style={btn} title={t("msgDelete")} onClick={onDelete}>🗑</button>}
+    </div>
+  );
 }
 
 function ShellStreamBlock({
@@ -145,7 +182,7 @@ function ShellStreamBlock({
   );
 }
 
-export default function ChatWindow({ messages, onShellInput }: Props) {
+export default function ChatWindow({ messages, onShellInput, onRegenerate, onDelete }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -210,15 +247,35 @@ export default function ChatWindow({ messages, onShellInput }: Props) {
               // L'utilisateur reste en texte brut (préserve les retours) ; l'assistant en Markdown.
               ...(msg.role === "user" ? { whiteSpace: "pre-wrap" as const } : {}),
             }}>
-              {msg.role === "assistant"
-                ? <Markdown content={msg.content} />
-                : msg.content}
+              {msg.role === "assistant" ? (() => {
+                const { thinking, answer, thinking_streaming } = splitThinking(msg.content);
+                return (
+                  <>
+                    {thinking && (
+                      <details className="ms-think" open={thinking_streaming}>
+                        <summary>🧠 {t("reasoning")}</summary>
+                        <div className="ms-think-body">{thinking}</div>
+                      </details>
+                    )}
+                    {answer && <Markdown content={answer} />}
+                  </>
+                );
+              })() : msg.content}
               {msg.streaming && i === messages.length - 1 && (
                 <span style={{ color: "var(--accent)", animation: "blink 1s step-end infinite" }}>▋</span>
               )}
             </div>
             {msg.model && (
               <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3, padding: "0 4px" }}>{msg.model}</div>
+            )}
+            {/* Actions sous le message (copier / régénérer / supprimer) */}
+            {!msg.streaming && (
+              <MsgActions
+                align={msg.role === "user" ? "flex-end" : "flex-start"}
+                onCopy={() => navigator.clipboard.writeText(splitThinking(msg.content).answer || msg.content)}
+                onRegen={msg.role === "assistant" && onRegenerate ? () => onRegenerate(i) : undefined}
+                onDelete={onDelete ? () => onDelete(i) : undefined}
+              />
             )}
           </div>
         );

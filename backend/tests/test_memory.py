@@ -294,6 +294,6 @@ class TestBuildContextPrefix:
             db.commit()
 
         result = await build_context_prefix("test query")
-        assert "MÉMOIRE PERTINENTE" in result
+        assert "NOTES DE MÉMOIRE" in result
         assert "relevant past message" in result
-        assert "FIN MÉMOIRE" in result
+        assert "FIN NOTES" in result

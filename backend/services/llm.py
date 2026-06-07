@@ -96,25 +96,27 @@ async def stream_response(messages: list, task_type: str = "reason"):
         kwargs.pop("think", None)   # ancienne version d'ollama sans paramètre think
         gen = await client.chat(**kwargs)
 
-    show = settings.SHOW_THINKING
-    stripper = None if show else ThinkStripper()
+    # On envoie le flux BRUT : le raisonnement est encadré par <think>…</think>
+    # (le frontend l'affiche dans un menu déroulant repliable, pas comme une réponse).
+    # Certains modèles mettent le raisonnement dans un champ « thinking » séparé : on
+    # le reconvertit en <think>…</think> pour un rendu uniforme.
+    in_think = False
     async for chunk in gen:
-        piece = chunk["message"]["content"]
-        # Certaines versions d'ollama renvoient le raisonnement à part : on l'ignore
-        # en mode épuré (sinon on l'ajoute au flux).
-        if show:
-            thinking = chunk["message"].get("thinking")
-            if thinking:
-                piece = thinking + piece
-            yield piece
-        else:
-            emit = stripper.feed(piece)
-            if emit:
-                yield emit
-    if stripper is not None:
-        tail = stripper.flush()
-        if tail:
-            yield tail
+        msg = chunk["message"]
+        thinking = msg.get("thinking")
+        content = msg.get("content", "")
+        if thinking:
+            if not in_think:
+                yield "<think>"
+                in_think = True
+            yield thinking
+        if content:
+            if in_think:
+                yield "</think>"
+                in_think = False
+            yield content
+    if in_think:
+        yield "</think>"
 
 
 async def complete(messages: list, model: str | None = None,

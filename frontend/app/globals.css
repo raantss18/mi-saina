@@ -173,6 +173,26 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .ms-md tr:nth-child(even) td { background: var(--surface-2); }
 .ms-md img { max-width: 100%; border-radius: 6px; }
 
+/* Raisonnement repliable (<details>) dans une réponse */
+.ms-think { margin: 0 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.ms-think > summary {
+  cursor: pointer; padding: 5px 10px; font-size: 11px; color: var(--text-muted);
+  list-style: none; user-select: none;
+}
+.ms-think > summary::-webkit-details-marker { display: none; }
+.ms-think > summary::before { content: "▸ "; }
+.ms-think[open] > summary::before { content: "▾ "; }
+.ms-think[open] > summary { border-bottom: 1px solid var(--border); }
+.ms-think-body {
+  padding: 8px 10px; color: var(--text-muted); white-space: pre-wrap;
+  max-height: 320px; overflow: auto; font-family: var(--font-mono); font-size: 11px; line-height: 1.5;
+}
+
+/* Actions sous un message (copier/régénérer/supprimer) */
+.ms-msg-actions { opacity: 0.45; transition: opacity 0.15s ease; }
+.ms-msg-actions:hover { opacity: 1; }
+.ms-msg-actions button:hover { color: var(--text); }
+
 /* État vide soigné (icône + message centrés) */
 .ms-empty {
   display: flex; flex-direction: column; align-items: center; gap: 8px;

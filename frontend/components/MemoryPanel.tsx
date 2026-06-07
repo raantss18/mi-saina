@@ -46,7 +46,6 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [histQuery, setHistQuery] = useState("");
   const [histResults, setHistResults] = useState<HistResult[]>([]);
 
   const fetchSessions = async () => {
@@ -78,26 +77,23 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
     fetchSessions();
   };
 
-  const handleHistSearch = async () => {
-    const q = histQuery.trim();
-    if (!q) { setHistResults([]); return; }
-    try {
-      const res = await fetch(`${API_BASE}/memory/history-search?q=${encodeURIComponent(q)}`);
-      if (res.ok) setHistResults(await res.json());
-    } catch {}
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  // Recherche unifiée : plein-texte (historique) + sémantique en parallèle.
+  const runSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) { setHistResults([]); setSearchResults([]); return; }
     setSearching(true);
     try {
-      const res = await fetch(`${API_BASE}/memory/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery, top_k: 5 }),
-      });
-      setSearchResults(await res.json());
-    } catch {}
+      const [h, s] = await Promise.all([
+        fetch(`${API_BASE}/memory/history-search?q=${encodeURIComponent(q)}`)
+          .then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch(`${API_BASE}/memory/search`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q, top_k: 5 }),
+        }).then(r => r.ok ? r.json() : []).catch(() => []),
+      ]);
+      setHistResults(Array.isArray(h) ? h : []);
+      setSearchResults(Array.isArray(s) ? s : []);
+    } catch { /* indispo */ }
     setSearching(false);
   };
 
@@ -199,81 +195,52 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
         ))}
       </div>
 
+      {/* Recherche unifiée : plein-texte (historique) + sémantique, une seule barre */}
       <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>{t("histSearch")}</div>
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>{t("searchTitle")}</div>
         <div style={{ display: "flex", gap: 4 }}>
           <input
-            value={histQuery}
-            onChange={e => setHistQuery(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleHistSearch()}
-            placeholder="Mot-clé dans tes anciens chats…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && runSearch()}
+            placeholder={t("searchPlaceholder")}
             style={{
               flex: 1, background: "var(--bg)", border: "1px solid var(--border)",
               color: "var(--text)", padding: "4px 6px", borderRadius: 4, fontSize: 11, outline: "none",
             }}
           />
-          <button onClick={handleHistSearch}
+          <button onClick={runSearch} disabled={searching}
             style={{ background: "var(--border)", border: "none", color: "var(--text)", padding: "4px 8px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-            🔍
+            {searching ? "…" : "🔍"}
           </button>
         </div>
-        {histResults.length > 0 && (
-          <div style={{ marginTop: 6, maxHeight: 180, overflowY: "auto" }}>
+        {(histResults.length > 0 || searchResults.length > 0) && (
+          <div style={{ marginTop: 6, maxHeight: 280, overflowY: "auto" }}>
+            {/* Sessions trouvées (plein-texte) — cliquables */}
             {histResults.map((r, i) => (
-              <div key={i}
+              <div key={`h${i}`}
                 onClick={() => onSelectSession(r.session_id)}
-                title="Ouvrir cette conversation"
+                title={t("spOpenResult")}
                 style={{
                   padding: "4px 6px", marginBottom: 4, cursor: "pointer",
                   background: "var(--bg)", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10,
                 }}>
                 <div style={{ color: "var(--accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.title}
+                  💬 {r.title}
                 </div>
                 <div style={{ color: "var(--text-muted)", marginTop: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                   {r.snippet}
                 </div>
               </div>
             ))}
-          </div>
-        )}
-      </div>
-
-      <div style={{ borderTop: "1px solid var(--border)", padding: "8px 10px" }}>
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, letterSpacing: 0.5 }}>{t("semSearch")}</div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSearch()}
-            placeholder="Rechercher..."
-            style={{
-              flex: 1, background: "var(--bg)", border: "1px solid var(--border)",
-              color: "var(--text)", padding: "4px 6px", borderRadius: 4, fontSize: 11,
-              outline: "none",
-            }}
-          />
-          <button
-            onClick={handleSearch}
-            disabled={searching}
-            style={{
-              background: "var(--border)", border: "none", color: "var(--text)",
-              padding: "4px 8px", borderRadius: 4, cursor: "pointer", fontSize: 11,
-            }}
-          >
-            {searching ? "..." : "↵"}
-          </button>
-        </div>
-        {searchResults.length > 0 && (
-          <div style={{ marginTop: 6, maxHeight: 160, overflowY: "auto" }}>
+            {/* Extraits sémantiques */}
             {searchResults.map((r, i) => (
-              <div key={i} style={{
+              <div key={`s${i}`} style={{
                 padding: "4px 6px", marginBottom: 4,
-                background: "var(--bg)", borderRadius: 4,
-                border: "1px solid var(--border)", fontSize: 10,
+                background: "var(--bg)", borderRadius: 4, border: "1px solid var(--border)", fontSize: 10,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: r.role === "user" ? "var(--accent)" : "var(--green)" }}>{r.role}</span>
+                  <span style={{ color: r.role === "user" ? "var(--accent)" : "var(--green)" }}>🧠 {r.role}</span>
                   <span style={{ color: "var(--text-muted)" }}>{r.score.toFixed(2)}</span>
                 </div>
                 <div style={{ color: "var(--text-muted)", marginTop: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>

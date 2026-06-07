@@ -229,6 +229,18 @@ const T: Dict = {
 
   // SearchResults
   srResults: { en: "RESULTS:", fr: "RÉSULTATS:", mg: "VALINY:" },
+
+  // ChatWindow — actions par message + raisonnement
+  reasoning: { en: "Reasoning", fr: "Raisonnement", mg: "Fisainana" },
+  msgCopy: { en: "Copy", fr: "Copier", mg: "Adikao" },
+  msgRegen: { en: "Regenerate", fr: "Régénérer", mg: "Avereno" },
+  msgDelete: { en: "Delete", fr: "Supprimer", mg: "Fafao" },
+  msgCopied: { en: "Copied", fr: "Copié", mg: "Voadika" },
+
+  // MemoryPanel — recherche unifiée
+  searchPlaceholder: { en: "Search your history (keywords or meaning)…", fr: "Rechercher dans l'historique (mots-clés ou sens)…", mg: "Hikaroka ao amin'ny tantara (teny na hevitra)…" },
+  searchTitle: { en: "SEARCH", fr: "RECHERCHE", mg: "FIKAROHANA" },
+  searchNone: { en: "No result.", fr: "Aucun résultat.", mg: "Tsy misy valiny." },
 };
 
 export function t(key: keyof typeof T): string {
