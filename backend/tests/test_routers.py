@@ -159,6 +159,27 @@ def test_refresh_machine_writes_and_returns(client, monkeypatch, tmp_path):
     assert "PROFIL MACHINE" in data["content"]
 
 
+# ── /config/config-map (carte de configuration) ───────────────────────────────
+
+def test_get_config_map_empty(client, monkeypatch, tmp_path):
+    import services.config_map as cm
+    monkeypatch.setattr(cm, "MAP_FILE", tmp_path / "config-map.md")
+    resp = client.get("/config/config-map")
+    assert resp.status_code == 200
+    assert resp.json()["content"] == ""
+
+
+def test_refresh_config_map(client, monkeypatch, tmp_path):
+    import services.config_map as cm
+    monkeypatch.setattr(cm, "MAP_FILE", tmp_path / "config-map.md")
+    monkeypatch.setattr(cm, "CONFIG_HOME", tmp_path)
+    resp = client.post("/config/config-map/refresh")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert "CONFIG CONNUE" in data["content"]
+
+
 # ── /health-monitor (bilan santé, propose-only) ────────────────────────────────
 
 def test_health_insights_shape(client):

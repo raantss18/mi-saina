@@ -8,6 +8,14 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.14] - 2026-06-08
+
+### Ajouté — carte de configuration (connaissance du setup)
+- **Carte de configuration** (`~/.config/mi-saina/config-map.md`) : scan **déterministe** (zéro LLM) et **secret-safe** de `~/.config`, `~/.local/bin` et `~/.local/share/applications` — applications configurées, **applis par défaut** (navigateur, PDF, etc.), **scripts/commandes perso**, thème, éditeur/terminal préférés, infos git non sensibles. Objectif : l'agent **connaît déjà ton setup** → moins d'hallucinations, moins d'erreurs de commandes, et **économie de tokens/temps** sur les tâches de configuration.
+  - **Stratégie token-efficace** : un **index compact** est injecté au system prompt ; le **détail** n'est lu par l'agent qu'**à la demande** via `[READ: ~/.config/mi-saina/config-map.md]` (vérifié live : une question « navigateur/éditeur par défaut ? » est répondue **sans exécuter aucune commande**).
+  - **Sûreté** : on ne lit que des **noms** (dossiers, scripts, lanceurs) et une **allowlist de clés non sensibles** ; tout fichier/clé ressemblant à un secret (token, clé, mot de passe, cookie, `.pem`, `id_rsa`…) est **ignoré**. Aucune valeur sensible n'est lue ni stockée.
+  - **Cadence** : scan au démarrage si périmé (> 24 h) puis ~1×/jour ; bouton **« Rafraîchir »** dans Config → Mémoire. Réglage `CONFIG_MAP`. Endpoints `GET/POST /config/config-map`.
+
 ## [1.0.13] - 2026-06-08
 
 ### Ajouté — connaissance de la machine & maintenance

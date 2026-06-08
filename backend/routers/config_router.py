@@ -39,7 +39,7 @@ def put_system_prompt(body: SystemPromptBody):
 
 
 # ── Contexte utilisateur & profil (locaux, ~/.config/mi-saina) ─────────────────
-from services import userctx, machine_profile  # noqa: E402
+from services import userctx, machine_profile, config_map  # noqa: E402
 
 
 class TextBody(BaseModel):
@@ -81,6 +81,23 @@ def refresh_machine():
     """(Re)collecte le profil machine maintenant (read-only, borné)."""
     try:
         return {"status": "ok", "content": machine_profile.refresh()}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
+# ── Carte de configuration (~/.config, ~/.local — déterministe, sans secrets) ──
+
+@router.get("/config-map")
+def get_config_map():
+    """Carte de configuration complète (vide si pas encore scannée)."""
+    return {"content": config_map.read()}
+
+
+@router.post("/config-map/refresh")
+def refresh_config_map():
+    """(Re)scanne maintenant ~/.config et ~/.local (read-only, sans secrets)."""
+    try:
+        return {"status": "ok", "content": config_map.refresh()}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 

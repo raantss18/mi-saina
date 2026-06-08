@@ -64,6 +64,8 @@ const T: Dict = {
   cfMachineRefresh: { en: "Refresh", fr: "Rafraîchir", mg: "Havaozy" },
   cfMachineScanning: { en: "Scanning…", fr: "Analyse…", mg: "Mandinika…" },
   cfMachineEmpty: { en: "Not collected yet — click Refresh.", fr: "Pas encore collecté — clique sur Rafraîchir.", mg: "Mbola tsy nangonina — tsindrio Havaozy." },
+  cfConfigMapTitle: { en: "Configuration map", fr: "Carte de configuration", mg: "Sarintany konfigirasiona" },
+  cfConfigMapHint: { en: "Deterministic scan of ~/.config and ~/.local (configured apps, default apps, your scripts) ~once a day. A compact index is injected; the agent reads the detail only when needed. No secrets (tokens/keys/passwords) are ever read.", fr: "Scan déterministe de ~/.config et ~/.local (apps configurées, applis par défaut, tes scripts) ~1×/jour. Un index compact est injecté ; l'agent lit le détail seulement au besoin. Aucun secret (token/clé/mot de passe) n'est lu.", mg: "Fandinihana ny ~/.config sy ~/.local (rindrambaiko voakonfigirina, scripts) indray mandeha isan'andro. Tsy misy tsiambaratelo vakiana mihitsy." },
   // Bilan santé
   healthTitle: { en: "System health", fr: "Bilan santé", mg: "Fahasalamana rafitra" },
   healthFix: { en: "Run", fr: "Exécuter", mg: "Tanteraho" },

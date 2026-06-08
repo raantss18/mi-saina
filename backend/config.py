@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     # erreurs journal) qui PROPOSENT des actions (n'exécutent jamais rien seuls).
     HEALTH_MONITOR: bool = True
     HEALTH_INTERVAL_MIN: int = 30
+    # Carte de configuration : scan déterministe de ~/.config et ~/.local (apps
+    # configurées, applis par défaut, scripts perso) → index compact injecté +
+    # détail consultable à la demande. Aucune valeur sensible lue. ~1×/jour.
+    CONFIG_MAP: bool = True
 
     class Config:
         env_file = str(_ENV_FILE)
@@ -178,6 +182,13 @@ EDITABLE_SETTINGS: dict = {
         "type": "int", "min": 5, "max": 240, "step": 5,
         "label": "Intervalle du bilan santé (min)",
         "help": "Fréquence des vérifications de santé (en minutes). Plus haut = moins intrusif.",
+    },
+    "CONFIG_MAP": {
+        "type": "bool",
+        "label": "Carte de configuration",
+        "help": "Scanne ~/.config et ~/.local (apps configurées, applis par défaut, scripts perso) ~1×/jour "
+                "et injecte un index compact → l'agent connaît ton setup, évite les erreurs et économise des "
+                "tokens. Aucune valeur sensible (token/clé/mot de passe) n'est lue. Bouton « Rafraîchir » dans Mémoire.",
     },
 }
 

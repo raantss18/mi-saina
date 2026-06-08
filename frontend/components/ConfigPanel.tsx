@@ -33,6 +33,8 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
   const [profile, setProfile] = useState("");
   const [machine, setMachine] = useState("");
   const [machineBusy, setMachineBusy] = useState(false);
+  const [configMap, setConfigMap] = useState("");
+  const [configMapBusy, setConfigMapBusy] = useState(false);
   const [memOk, setMemOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
@@ -102,6 +104,7 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
     fetch(`${API_BASE}/config/context`).then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
     fetch(`${API_BASE}/config/profile`).then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
     fetch(`${API_BASE}/config/machine`).then(r => r.json()).then(d => setMachine(d.content || "")).catch(() => {});
+    fetch(`${API_BASE}/config/config-map`).then(r => r.json()).then(d => setConfigMap(d.content || "")).catch(() => {});
     fetch(`${API_BASE}/config/settings`).then(r => r.json())
       .then(d => { setSetSchema(d.schema); setSetValues(d.values); }).catch(() => {});
     fetchSkills();
@@ -179,6 +182,16 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
       if (d.content) setMachine(d.content);
     } catch { /* backend indispo */ }
     setMachineBusy(false);
+  };
+
+  const refreshConfigMap = async () => {
+    setConfigMapBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/config/config-map/refresh`, { method: "POST" });
+      const d = await r.json();
+      if (d.content) setConfigMap(d.content);
+    } catch { /* backend indispo */ }
+    setConfigMapBusy(false);
   };
 
   const fetchSkills = () => {
@@ -460,6 +473,24 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
             <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{t("cfMachineHint")}</div>
             <pre style={{ margin: 0, maxHeight: 220, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
               {machine.trim() || t("cfMachineEmpty")}
+            </pre>
+          </div>
+
+          {/* Carte de configuration : apps configurées, applis par défaut, scripts (sans secrets) */}
+          <div style={{
+            marginTop: 6, padding: "10px 12px", background: "var(--bg)",
+            border: "1px solid var(--border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>{t("cfConfigMapTitle")}</div>
+              <button onClick={refreshConfigMap} disabled={configMapBusy}
+                style={{ background: configMapBusy ? "var(--border)" : "var(--accent)", border: "none", color: configMapBusy ? "var(--text-muted)" : "var(--accent-contrast)", padding: "5px 12px", borderRadius: 4, cursor: configMapBusy ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
+                {configMapBusy ? t("cfMachineScanning") : t("cfMachineRefresh")}
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{t("cfConfigMapHint")}</div>
+            <pre style={{ margin: 0, maxHeight: 220, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {configMap.trim() || t("cfMachineEmpty")}
             </pre>
           </div>
         </div>

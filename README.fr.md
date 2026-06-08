@@ -25,6 +25,7 @@
 - **Dossier de travail par session** — attache un dossier à une session (📁 dans l'en-tête) : ses commandes shell s'exécutent **dans ce dossier** et le modèle l'utilise pour des réponses plus précises (chemins relatifs).
 - **Profil machine** — collecte au 1er démarrage tes chemins réels (Téléchargements, Documents…), la structure du home et les outils installés, pour que l'assistant agisse sur les bons chemins au lieu de deviner. Bouton « Rafraîchir » dans Config → Mémoire.
 - **Bilan santé (propose seulement)** — vérifie régulièrement le système (mises à jour, services en échec, disque, erreurs récentes) et **propose** des actions dans un bandeau. N'exécute jamais rien tout seul — cliquer pré-remplit le chat pour que tu valides.
+- **Carte de configuration** — scan déterministe et sans secrets de `~/.config` et `~/.local` (apps configurées, applis par défaut, tes scripts, thème) : l'assistant connaît ton setup → moins d'erreurs de commandes, moins d'hallucinations, moins de tokens. Index compact injecté, détail lu à la demande. Aucun secret n'est lu.
 - **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
 - **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
 - **Fenêtre desktop native** (Tauri) — appli dans le menu Applications, **icône dans la barre système** au démarrage, raccourci global, notifications, palette de commandes ⌘K, thème clair/sombre/auto. Indépendante du navigateur et du bureau (KDE/GNOME/XFCE/Wayland).

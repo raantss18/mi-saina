@@ -10,9 +10,10 @@ from routers import (chat, shell, search, memory as memory_router,
                      health as health_router)
 from services.scheduler import scheduler_loop
 from services.health_monitor import health_loop
+from services.config_map import config_map_loop
 from config import settings
 
-app = FastAPI(title="mi-saina API", version="1.0.13")
+app = FastAPI(title="mi-saina API", version="1.0.14")
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -45,6 +46,7 @@ async def _start_scheduler():
         asyncio.create_task(asyncio.to_thread(machine_profile.ensure_collected))
     asyncio.create_task(scheduler_loop())
     asyncio.create_task(health_loop())
+    asyncio.create_task(config_map_loop())
 
 app.add_middleware(
     CORSMiddleware,

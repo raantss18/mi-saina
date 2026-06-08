@@ -15,7 +15,7 @@ from services.memory import (
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
-from services import diagnostics, userctx, mcp_client, documents, rag, machine_profile
+from services import diagnostics, userctx, mcp_client, documents, rag, machine_profile, config_map
 from services.sysinfo import system_block
 from services.web_search import search_web
 
@@ -85,6 +85,12 @@ def _load_system_prompt() -> str:
         mblock = machine_profile.machine_block()
         if mblock:
             parts.append(mblock)
+    # Carte de configuration : index COMPACT seulement (le détail est lu à la demande
+    # via [READ: ~/.config/mi-saina/config-map.md]) → connaissance du setup sans coût.
+    if getattr(settings, "CONFIG_MAP", True):
+        cblock = config_map.index_block()
+        if cblock:
+            parts.append(cblock)
     ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
     if ctx:
         parts.append(ctx)
