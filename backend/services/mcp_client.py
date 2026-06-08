@@ -243,26 +243,20 @@ def _build_tools_block() -> str:
 
     # Consignes d'usage ciblées (le modèle local sait mieux quoi déclencher).
     if has_fetch:
+        # Guidage TERSE et SANS exemple concret : les petits modèles prennent un
+        # exemple de tâche pour une vraie demande de l'utilisateur (contamination).
         lines.append(
-            "\nQUAND L'UTILISATEUR DONNE UN SITE OU UNE URL (ex. « résume "
-            "raantss18.github.io/antsamath ») : récupère SON contenu avec "
-            "[MCP: fetch.fetch {\"url\": \"https://L-URL-EXACTE-DEMANDÉE\"}] — reprends "
-            "l'URL EXACTE de l'utilisateur (ajoute https:// si absent), n'en invente "
-            "pas une autre. Ne résume QUE le contenu réellement renvoyé par ce fetch. "
-            "Si le fetch échoue (erreur, vide), DIS-LE clairement et propose de "
-            "réessayer — n'invente JAMAIS de contenu et ne réutilise PAS un site "
-            "demandé précédemment. N'utilise [SEARCH: …] que pour une recherche "
-            "générale sans site précis.")
+            "\nSI ET SEULEMENT SI l'utilisateur fournit un site/URL dans SON message "
+            "courant : récupère le contenu avec [MCP: fetch.fetch {\"url\": \"<l'URL "
+            "EXACTE de l'utilisateur, https:// ajouté si absent>\"}]. Ne résume QUE le "
+            "contenu réellement renvoyé ; si le fetch échoue, DIS-LE — n'invente jamais "
+            "de contenu et ne réutilise pas un site d'une demande précédente. "
+            "N'invoque AUCUN fetch si l'utilisateur n'a pas donné d'URL.")
         lines.append(
-            "POUR TÉLÉCHARGER DES FICHIERS depuis un site (ex. « télécharge les "
-            "sujets de bac 2026 sur apmep ») : procède en plusieurs étapes — "
-            "(1) [MCP: fetch.fetch {\"url\": \"https://…\"}] pour ouvrir la page "
-            "pertinente et LIRE les liens (suis les liens de section si besoin, une "
-            "page à la fois) ; (2) repère les URLs des fichiers (.pdf, .zip…) dans le "
-            "contenu récupéré ; (3) crée un dossier puis télécharge chaque fichier "
-            "avec le shell : [EXEC: mkdir -p ~/Téléchargements/<sujet> && wget -q -P "
-            "~/Téléchargements/<sujet> \"<url-du-fichier>\"]. Utilise les URLs EXACTES "
-            "vues dans la page, n'invente jamais de lien.")
+            "Pour télécharger des fichiers d'une page DEMANDÉE par l'utilisateur : "
+            "(1) fetch la page pour LIRE les vrais liens ; (2) télécharge avec le shell "
+            "vers un dossier dédié — [EXEC: mkdir -p <dossier> && wget -q -P <dossier> "
+            "\"<url-réelle-vue-dans-la-page>\"]. N'invente jamais de lien.")
     return "\n".join(lines)
 
 

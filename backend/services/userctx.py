@@ -8,6 +8,7 @@ Tout est rangé dans ~/.config/mi-saina/ et injecté automatiquement dans le pro
 """
 
 import os
+import re
 from datetime import date
 from pathlib import Path
 
@@ -16,6 +17,14 @@ from config import settings
 CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "mi-saina"
 CONTEXT_FILE = CONFIG_HOME / "context.md"
 PROFILE_FILE = CONFIG_HOME / "profile.md"
+
+# Le profil ne doit JAMAIS affirmer l'environnement (OS/distribution/système de
+# fichiers) : c'est auto-détecté à l'exécution, et une telle « mémoire » est presque
+# toujours une hallucination qui contamine ensuite toutes les sessions.
+_ENV_CLAIM_RE = re.compile(
+    r"\b(windows|macos|mac os|ubuntu|debian|fedora|arch linux|système de fichiers|file ?system)\b",
+    re.IGNORECASE,
+)
 
 
 def _read(path: Path) -> str:
@@ -51,6 +60,8 @@ def append_profile(fact: str) -> None:
     fact = fact.strip()
     if not fact:
         return
+    if _ENV_CLAIM_RE.search(fact):
+        return                       # affirmation d'environnement → jamais mémorisée
     existing = read_profile()
     if fact.lower() in existing.lower():
         return                       # déjà connu → pas de doublon

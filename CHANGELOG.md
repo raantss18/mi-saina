@@ -8,6 +8,21 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.12] - 2026-06-08
+
+### Corrigé — sûreté (hallucinations / auto-empoisonnement)
+- **Boucle d'auto-empoisonnement de la mémoire** (bug critique) : l'auto-mémoire avait enregistré un « fait » **faux et inventé** — « l'utilisateur utilise le système de fichiers **Windows** » — qui était ensuite injecté dans **toutes** les sessions. Résultat : le modèle se croyait sous Windows (PowerShell, `C:\…`) et **fabriquait** des résultats (arborescence de dossiers « créée » sans qu'aucune commande ne tourne). Corrigé en profondeur :
+  - **Extraction d'auto-mémoire durcie** : n'enregistre QUE des préférences/identité **explicitement** énoncées par l'utilisateur ; **interdiction d'inférer** quoi que ce soit, et **jamais** l'OS/distribution/système de fichiers (auto-détectés). Une tâche/requête ponctuelle n'est plus prise pour une préférence.
+  - **Garde-fou anti-empoisonnement** (`services.userctx.append_profile`) : toute « mémoire » affirmant l'environnement (Windows/macOS/Ubuntu/filesystem…) est **rejetée à l'écriture** — défense en profondeur, même pour `[REMEMBER: …]`.
+  - **Profil purgé** des entrées erronées (le faux « Windows » + des tâches stockées par erreur comme préférences).
+- **Commandes-gabarits exécutées par erreur** : les petits modèles **recopiaient la syntaxe d'exemple** (`[EXEC: commande]`, `[EXEC: …]`) qui était alors exécutée — le résolveur d'applis lançait même une appli au hasard (ex. *AntiMicroX* pour « commande »). Ces placeholders (`commande`/`command`/`cmd`/`…`/`<command>`/ponctuation seule) sont désormais **ignorés** avant exécution.
+- **Contamination par les exemples du guidage MCP** : le bloc « fetch/téléchargement » contenait des exemples concrets (« résume raantss18.github.io… », « télécharge les sujets de bac 2026 sur apmep ») que le modèle prenait pour de **vraies demandes** de l'utilisateur. Guidage rendu **concis et sans exemple piégeux** ; un fetch n'est déclenché que si l'utilisateur fournit réellement une URL.
+
+### Renforcé
+- **System prompt — règle anti-fabrication explicite** : nouvelle section « NEVER FABRICATE » — interdiction de prétendre avoir créé/listé/déplacé/installé quoi que ce soit **sans avoir réellement exécuté** la commande et reçu sa sortie ; l'OS/les chemins viennent **uniquement** du bloc SYSTEM (machine Linux, jamais Windows/macOS).
+
+> Couvert par de nouveaux tests (`tests/test_chat_helpers.py`, `tests/test_userctx.py`) + reproduction live de bout en bout : la requête qui fabriquait une arborescence liste désormais le **vrai** dossier (`ls`/`du` réels) sans rien inventer.
+
 ## [1.0.11] - 2026-06-08
 
 > Release de **maintenance / documentation** — aucun changement fonctionnel par

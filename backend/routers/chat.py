@@ -29,6 +29,24 @@ RAG_RE = re.compile(r'\[RAG:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 THINK_RE = re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE)
 
 
+# Placeholders de syntaxe que les petits modèles RECOPIENT depuis les instructions
+# (« [EXEC: command] », « [EXEC: …] ») au lieu d'une vraie commande. Les exécuter
+# est dangereux (le résolveur d'applis lançait p.ex. AntiMicroX pour « commande »).
+_PLACEHOLDER_CMDS = {"command", "commande", "cmd", "...", "…", "<command>", "<commande>",
+                     "command here", "your command", "ta commande", "votre commande"}
+
+
+def _is_placeholder_cmd(cmd: str) -> bool:
+    """Vrai si `cmd` est un placeholder de syntaxe recopié, pas une vraie commande."""
+    c = cmd.strip().strip("`").strip()
+    if not c:
+        return True
+    if c.lower() in _PLACEHOLDER_CMDS:
+        return True
+    # Uniquement de la ponctuation / des chevrons de gabarit (ex. « <...> », « … »).
+    return re.fullmatch(r"[<>.…\s]+", c) is not None
+
+
 def _clean_for_store(text: str) -> str:
     """Retire le raisonnement <think>…</think> avant de stocker un message :
     garde la mémoire et les embeddings propres (sinon le raisonnement d'une
@@ -552,7 +570,8 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 userctx.append_profile(fact)
                 await websocket.send_text(json.dumps({"type": "memory_saved", "fact": fact}))
 
-        cmds = [c.strip() for c in EXEC_RE.findall(full_response) if c.strip()]
+        cmds = [c.strip() for c in EXEC_RE.findall(full_response)
+                if c.strip() and not _is_placeholder_cmd(c)]
         mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
         searches = [q.strip() for q in SEARCH_RE.findall(full_response) if q.strip()]
         reads = [r.strip() for r in READ_RE.findall(full_response) if r.strip()]
@@ -859,10 +878,25 @@ async def chat_ws(websocket: WebSocket):
 
 
 _AUTO_MEM_SYSTEM = (
-    "Extract ONE durable, reusable fact or preference about the USER or their machine from their "
-    "message (e.g. their name, tools/editors they use, their setup, recurring preferences, language). "
-    "Ignore one-off task details and questions. If there is nothing durable, reply EXACTLY: NONE. "
-    "Otherwise reply with only the fact, one short sentence."
+    "You extract a durable USER preference or identity fact, ONLY if the user EXPLICITLY states it "
+    "in their message. Examples of valid facts: their name, an editor/tool they say they use, their "
+    "preferred language, a stated recurring preference.\n"
+    "STRICT RULES — reply EXACTLY 'NONE' if any apply:\n"
+    "- The message is a task, request, question or one-off action (e.g. 'list my folder', 'install X', "
+    "'organize my downloads') — these are NOT durable facts.\n"
+    "- The fact is not LITERALLY stated by the user. NEVER infer, guess or deduce anything.\n"
+    "- Anything about the operating system, distribution or filesystem (Windows/Linux/macOS…): NEVER "
+    "store these — the real environment is auto-detected elsewhere and you must not guess it.\n"
+    "When in doubt, reply NONE. Otherwise reply with ONLY the fact, one short sentence, no preamble."
+)
+
+# Garde-fou : motifs qui ne doivent JAMAIS entrer dans le profil (anti-empoisonnement).
+# L'environnement (OS/distro/FS) est auto-détecté — une « mémoire » qui l'affirme est une
+# hallucination qui contaminerait toutes les sessions suivantes.
+_BAD_FACT_RE = re.compile(
+    r"\b(windows|macos|mac os|ubuntu|debian|fedora|arch|linux|système de fichiers|file ?system|"
+    r"wants? to|veut |souhaite |would like|aimerait|asked to|a demandé|please|merci de)\b",
+    re.IGNORECASE,
 )
 
 
@@ -878,6 +912,10 @@ async def _auto_memory(user_input: str, websocket: WebSocket) -> None:
         )
         fact = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip().strip("-• ").strip()
         if not fact or fact.upper().startswith("NONE") or len(fact) > 200:
+            return
+        # Anti-empoisonnement : on rejette tout « fait » affirmant l'environnement
+        # (OS/FS, auto-détecté) ou ressemblant à une tâche/requête ponctuelle.
+        if _BAD_FACT_RE.search(fact):
             return
         before = userctx.read_profile()
         userctx.append_profile(fact)

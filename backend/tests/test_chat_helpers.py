@@ -9,7 +9,58 @@ import re
 from unittest.mock import patch
 
 # Import from the chat router (pure logic, no WebSocket needed)
-from routers.chat import EXEC_RE, _build_messages, _format_exec_feedback, _MAX_FEEDBACK_CHARS
+from routers.chat import (
+    EXEC_RE, _build_messages, _format_exec_feedback, _MAX_FEEDBACK_CHARS,
+    _is_placeholder_cmd, _BAD_FACT_RE,
+)
+
+
+# ── Garde-fou : commandes-gabarits recopiées depuis les instructions ───────────
+
+class TestPlaceholderCmd:
+    @pytest.mark.parametrize("cmd", [
+        "commande", "command", "cmd", "...", "…", "<command>", "<commande>",
+        "  …  ", "`commande`", "<...>", "command here", "votre commande", "",
+    ])
+    def test_placeholders_rejected(self, cmd):
+        assert _is_placeholder_cmd(cmd) is True
+
+    @pytest.mark.parametrize("cmd", [
+        "ls -la ~/Downloads", "paru -Syu", "echo hello", "du -sh ~/*",
+        "cat notes.md", "mkdir -p ~/projet",
+    ])
+    def test_real_commands_kept(self, cmd):
+        assert _is_placeholder_cmd(cmd) is False
+
+    def test_filter_in_extraction(self):
+        # Le modèle recopie la syntaxe d'exemple + une vraie commande
+        text = "Syntaxe : [EXEC: commande]. Maintenant : [EXEC: ls -la]"
+        cmds = [c.strip() for c in EXEC_RE.findall(text)
+                if c.strip() and not _is_placeholder_cmd(c)]
+        assert cmds == ["ls -la"]
+
+
+# ── Garde-fou : faits empoisonnés (OS/environnement, tâches) ───────────────────
+
+class TestBadFact:
+    @pytest.mark.parametrize("fact", [
+        "L'utilisateur utilise le système de fichiers Windows.",
+        "The user is on macOS.",
+        "User wants to see disk usage of their home.",
+        "L'utilisateur souhaite organiser son dossier Téléchargements.",
+        "The user uses the Linux filesystem.",
+    ])
+    def test_bad_facts_blocked(self, fact):
+        assert _BAD_FACT_RE.search(fact) is not None
+
+    @pytest.mark.parametrize("fact", [
+        "The user prefers the French language.",
+        "L'utilisateur préfère paru pour les mises à jour.",
+        "The user's name is Antsa.",
+        "L'utilisateur utilise l'éditeur Neovim.",
+    ])
+    def test_genuine_preferences_allowed(self, fact):
+        assert _BAD_FACT_RE.search(fact) is None
 
 
 # ── EXEC_RE ───────────────────────────────────────────────────────────────────
