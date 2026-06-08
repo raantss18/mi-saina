@@ -8,6 +8,15 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.11] - 2026-06-08
+
+> Release de **maintenance / documentation** — aucun changement fonctionnel par
+> rapport à v1.0.10 (le binaire est identique).
+
+### Documentation
+- **README (EN/FR/MG)** : ajout des fonctionnalités **sessions isolées** et **dossier de travail par session** (puces + section d'usage dédiée).
+- **CHANGELOG réaligné sur le schéma `v1.0.x`** : les en-têtes correspondent désormais aux releases publiées sur GitHub (`v1.0.0` → `v1.0.10`), l'ancien historique interne `1.1.0` → `1.6.1` est consolidé sous **[1.0.0]** (première release publique) et le bucket *[Non publié]* ventilé dans les releases concernées. Aucun détail technique perdu.
+
 ## [1.0.10] - 2026-06-08
 
 ### Corrigé
