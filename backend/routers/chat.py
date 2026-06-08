@@ -15,7 +15,7 @@ from services.memory import (
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
-from services import diagnostics, userctx, mcp_client, documents, rag
+from services import diagnostics, userctx, mcp_client, documents, rag, machine_profile
 from services.sysinfo import system_block
 from services.web_search import search_web
 
@@ -36,12 +36,20 @@ _PLACEHOLDER_CMDS = {"command", "commande", "cmd", "...", "…", "<command>", "<
                      "command here", "your command", "ta commande", "votre commande"}
 
 
+# Phrases-gabarits entre guillemets que le modèle recopie (« xdg-open "full path" »).
+_PLACEHOLDER_PHRASES = re.compile(
+    r"""["'`](full path|chemin complet|chemin du fichier|path/to/\S*|votre fichier|"""
+    r"""your file|nom du fichier|file ?name|url[- ]?exacte?)["'`]""", re.IGNORECASE)
+
+
 def _is_placeholder_cmd(cmd: str) -> bool:
     """Vrai si `cmd` est un placeholder de syntaxe recopié, pas une vraie commande."""
     c = cmd.strip().strip("`").strip()
     if not c:
         return True
     if c.lower() in _PLACEHOLDER_CMDS:
+        return True
+    if _PLACEHOLDER_PHRASES.search(c):
         return True
     # Uniquement de la ponctuation / des chevrons de gabarit (ex. « <...> », « … »).
     return re.fullmatch(r"[<>.…\s]+", c) is not None
@@ -72,6 +80,11 @@ def _load_system_prompt() -> str:
     base = f"{lang}\n\n{base}"
     # Infos matériel/distribution détectées à l'exécution (jamais versionnées)
     parts = [base, system_block()]
+    # Profil machine (chemins XDG réels, structure du home, outils) — si collecté.
+    if getattr(settings, "MACHINE_PROFILE", True):
+        mblock = machine_profile.machine_block()
+        if mblock:
+            parts.append(mblock)
     ctx = userctx.context_block()      # contexte global + projet + profil utilisateur
     if ctx:
         parts.append(ctx)
@@ -570,8 +583,15 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 userctx.append_profile(fact)
                 await websocket.send_text(json.dumps({"type": "memory_saved", "fact": fact}))
 
-        cmds = [c.strip() for c in EXEC_RE.findall(full_response)
-                if c.strip() and not _is_placeholder_cmd(c)]
+        # Extraction + filtres : on ignore les placeholders et on DÉDUPLIQUE les
+        # commandes identiques d'une même réponse (les petits modèles « bouclent »
+        # parfois en répétant 20× la même commande — inutile et déroutant).
+        cmds, _seen_cmds = [], set()
+        for c in EXEC_RE.findall(full_response):
+            c = c.strip()
+            if c and not _is_placeholder_cmd(c) and c not in _seen_cmds:
+                _seen_cmds.add(c)
+                cmds.append(c)
         mcp_calls = mcp_client.parse_calls(full_response) if settings.MCP_ENABLED else []
         searches = [q.strip() for q in SEARCH_RE.findall(full_response) if q.strip()]
         reads = [r.strip() for r in READ_RE.findall(full_response) if r.strip()]

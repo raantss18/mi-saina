@@ -10,6 +10,7 @@ import SchedulePanel from "../components/SchedulePanel";
 import ThemeToggle from "../components/ThemeToggle";
 import CommandPalette, { Command } from "../components/CommandPalette";
 import WelcomeScreen from "../components/WelcomeScreen";
+import HealthInsights from "../components/HealthInsights";
 import ArtifactsPanel, { Artifact, extractArtifacts } from "../components/ArtifactsPanel";
 import { API_BASE, WS_BASE } from "../lib/config";
 import { notify } from "../lib/desktop";
@@ -809,6 +810,9 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Bilan santé (propose seulement — pré-remplit le chat, n'exécute rien) */}
+        <HealthInsights onPick={pickExample} />
 
         {/* Chat + Terminal (panneau optionnel à côté) */}
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>

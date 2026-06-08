@@ -6,10 +6,13 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import (chat, shell, search, memory as memory_router,
-                     models as models_router, config_router, schedule, update, rag)
+                     models as models_router, config_router, schedule, update, rag,
+                     health as health_router)
 from services.scheduler import scheduler_loop
+from services.health_monitor import health_loop
+from config import settings
 
-app = FastAPI(title="mi-saina API", version="1.0.12")
+app = FastAPI(title="mi-saina API", version="1.0.13")
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -35,9 +38,13 @@ async def _origin_guard(request: Request, call_next):
 
 @app.on_event("startup")
 async def _start_scheduler():
-    from services import userctx
+    from services import userctx, machine_profile
     userctx.ensure_files()   # crée context.md/profile.md vides si absents
+    # Profil machine : collecte au 1er démarrage (en fond, non bloquant).
+    if getattr(settings, "MACHINE_PROFILE", True):
+        asyncio.create_task(asyncio.to_thread(machine_profile.ensure_collected))
     asyncio.create_task(scheduler_loop())
+    asyncio.create_task(health_loop())
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +62,7 @@ app.include_router(config_router.router, prefix="/config")
 app.include_router(schedule.router, prefix="/schedule")
 app.include_router(update.router, prefix="/update")
 app.include_router(rag.router, prefix="/rag")
+app.include_router(health_router.router, prefix="/health-monitor")
 
 
 @app.get("/health")

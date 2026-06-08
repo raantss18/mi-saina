@@ -138,6 +138,47 @@ def test_clean_for_store_keeps_plain_text():
     assert _clean_for_store("Réponse simple") == "Réponse simple"
 
 
+# ── /config/machine (profil machine) ───────────────────────────────────────────
+
+def test_get_machine_empty(client, monkeypatch, tmp_path):
+    import services.machine_profile as mp
+    monkeypatch.setattr(mp, "MACHINE_FILE", tmp_path / "machine.md")
+    resp = client.get("/config/machine")
+    assert resp.status_code == 200
+    assert resp.json()["content"] == ""
+
+
+def test_refresh_machine_writes_and_returns(client, monkeypatch, tmp_path):
+    import services.machine_profile as mp
+    monkeypatch.setattr(mp, "MACHINE_FILE", tmp_path / "machine.md")
+    monkeypatch.setattr(mp, "CONFIG_HOME", tmp_path)
+    resp = client.post("/config/machine/refresh")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert "PROFIL MACHINE" in data["content"]
+
+
+# ── /health-monitor (bilan santé, propose-only) ────────────────────────────────
+
+def test_health_insights_shape(client):
+    resp = client.get("/health-monitor/insights")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "findings" in data and "enabled" in data
+    assert isinstance(data["findings"], list)
+
+
+def test_health_check_runs(client, monkeypatch):
+    import services.health_monitor as hm
+    fake = {"checked_at": "2026-06-08T00:00:00+00:00", "running": False,
+            "findings": [hm._finding("disk", "warning", "T", "D", "s", "ls")], "enabled": True}
+    monkeypatch.setattr(hm, "run_checks", lambda: fake)
+    resp = client.post("/health-monitor/check")
+    assert resp.status_code == 200
+    assert resp.json()["findings"][0]["id"] == "disk"
+
+
 # ── /config/system-prompt ─────────────────────────────────────────────────────
 
 def test_get_system_prompt_default(client):

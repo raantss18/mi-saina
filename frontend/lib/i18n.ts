@@ -58,6 +58,17 @@ const T: Dict = {
   navConfig: { en: "Config", fr: "Config", mg: "Konfigirasiona" },
   navTasks: { en: "Tasks", fr: "Tâches", mg: "Asa" },
   noSession: { en: "No session", fr: "Aucune session", mg: "Tsy misy session" },
+  // Profil machine (Config → Mémoire)
+  cfMachineTitle: { en: "Machine profile", fr: "Profil machine", mg: "Mombamomba ny milina" },
+  cfMachineHint: { en: "Real user paths (Downloads, Documents…), home structure and installed tools — injected so the assistant is precise. Collected at first launch.", fr: "Chemins réels (Téléchargements, Documents…), structure du home et outils installés — injectés pour que l'assistant soit précis. Collecté au 1er démarrage.", mg: "Lalana marina (Téléchargements, Documents…), firafitry ny home sy fitaovana voapetraka — ampidirina mba ho marina ny mpanampy. Angonina amin'ny fiantombohana voalohany." },
+  cfMachineRefresh: { en: "Refresh", fr: "Rafraîchir", mg: "Havaozy" },
+  cfMachineScanning: { en: "Scanning…", fr: "Analyse…", mg: "Mandinika…" },
+  cfMachineEmpty: { en: "Not collected yet — click Refresh.", fr: "Pas encore collecté — clique sur Rafraîchir.", mg: "Mbola tsy nangonina — tsindrio Havaozy." },
+  // Bilan santé
+  healthTitle: { en: "System health", fr: "Bilan santé", mg: "Fahasalamana rafitra" },
+  healthFix: { en: "Run", fr: "Exécuter", mg: "Tanteraho" },
+  healthRunTip: { en: "Pre-fills the chat with this command — you confirm before it runs", fr: "Pré-remplit le chat avec cette commande — tu valides avant exécution", mg: "Mameno ny resaka amin'ity baiko ity — manamarina ianao alohan'ny hanatanterahana" },
+  healthDismiss: { en: "Dismiss", fr: "Ignorer", mg: "Avela" },
   workdir: { en: "Folder", fr: "Dossier", mg: "Lahatahiry" },
   workdirSet: { en: "Set a working folder for this session", fr: "Définir un dossier de travail pour cette session", mg: "Mametraka lahatahiry fiasana ho an'ity session ity" },
   workdirActive: { en: "Working folder", fr: "Dossier de travail", mg: "Lahatahiry fiasana" },

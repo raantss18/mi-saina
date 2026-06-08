@@ -32,12 +32,29 @@ class TestPlaceholderCmd:
     def test_real_commands_kept(self, cmd):
         assert _is_placeholder_cmd(cmd) is False
 
+    @pytest.mark.parametrize("cmd", [
+        'xdg-open "full path"', 'xdg-open "chemin complet"',
+        'cat "path/to/file"', 'open "votre fichier"',
+    ])
+    def test_quoted_template_phrases_rejected(self, cmd):
+        assert _is_placeholder_cmd(cmd) is True
+
     def test_filter_in_extraction(self):
         # Le modèle recopie la syntaxe d'exemple + une vraie commande
         text = "Syntaxe : [EXEC: commande]. Maintenant : [EXEC: ls -la]"
         cmds = [c.strip() for c in EXEC_RE.findall(text)
                 if c.strip() and not _is_placeholder_cmd(c)]
         assert cmds == ["ls -la"]
+
+    def test_dedup_repeated_commands(self):
+        # Dégénérescence : le modèle répète 5× la même commande dans une réponse
+        text = "[EXEC: ls ~/Downloads]" * 5 + "[EXEC: du -sh ~/Downloads]"
+        cmds, seen = [], set()
+        for c in EXEC_RE.findall(text):
+            c = c.strip()
+            if c and not _is_placeholder_cmd(c) and c not in seen:
+                seen.add(c); cmds.append(c)
+        assert cmds == ["ls ~/Downloads", "du -sh ~/Downloads"]
 
 
 # ── Garde-fou : faits empoisonnés (OS/environnement, tâches) ───────────────────

@@ -23,6 +23,8 @@
 - **Memory** — semantic + full-text search of history, an auto-built user profile, project context files.
 - **Isolated sessions** — each conversation is self-contained: no cross-session bleed (a new chat never inherits an unrelated past topic). Semantic recall stays available on demand from the sidebar search.
 - **Per-session working folder** — attach a folder to a session (📁 in the header): its shell commands run **inside that folder** and the model uses it for more precise, relative-path answers.
+- **Machine profile** — collects your real paths (Downloads, Documents…), home structure and installed tools at first launch, so the assistant acts on the right paths instead of guessing. Refresh anytime in Config → Memory.
+- **Health monitor (propose-only)** — periodically checks the system (available updates, failed services, disk, recent errors) and **suggests** actions in a banner. It never runs anything on its own — clicking pre-fills the chat for you to confirm.
 - **Native desktop window** (Tauri) — app in your application menu, **system-tray icon** at startup, global shortcut, notifications, ⌘K command palette, light/dark/auto theme, artifacts panel.
 - **Multilingual** — English, French, Malagasy (UI + assistant replies), chosen at install and changeable in settings.
 

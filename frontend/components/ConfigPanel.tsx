@@ -31,6 +31,8 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
   const [tab, setTab] = useState<CfTab>("prompt");
   const [context, setContext] = useState("");
   const [profile, setProfile] = useState("");
+  const [machine, setMachine] = useState("");
+  const [machineBusy, setMachineBusy] = useState(false);
   const [memOk, setMemOk] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
@@ -99,6 +101,7 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
       .then(r => r.json()).then(d => { setSystemPrompt(d.content); setSavedPrompt(d.content); }).catch(() => {});
     fetch(`${API_BASE}/config/context`).then(r => r.json()).then(d => setContext(d.content)).catch(() => {});
     fetch(`${API_BASE}/config/profile`).then(r => r.json()).then(d => setProfile(d.content)).catch(() => {});
+    fetch(`${API_BASE}/config/machine`).then(r => r.json()).then(d => setMachine(d.content || "")).catch(() => {});
     fetch(`${API_BASE}/config/settings`).then(r => r.json())
       .then(d => { setSetSchema(d.schema); setSetValues(d.values); }).catch(() => {});
     fetchSkills();
@@ -166,6 +169,16 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: profile }),
     });
     setMemOk(t("saved")); setTimeout(() => setMemOk(""), 2000);
+  };
+
+  const refreshMachine = async () => {
+    setMachineBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/config/machine/refresh`, { method: "POST" });
+      const d = await r.json();
+      if (d.content) setMachine(d.content);
+    } catch { /* backend indispo */ }
+    setMachineBusy(false);
   };
 
   const fetchSkills = () => {
@@ -430,6 +443,24 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
             {ragLog.length > 0 && (
               <pre style={{ margin: 0, maxHeight: 140, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "6px 8px", fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap" }}>{ragLog.join("\n")}</pre>
             )}
+          </div>
+
+          {/* Profil machine : chemins réels + structure du home + outils */}
+          <div style={{
+            marginTop: 6, padding: "10px 12px", background: "var(--bg)",
+            border: "1px solid var(--border)", borderRadius: 8, display: "flex", flexDirection: "column", gap: 8,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>{t("cfMachineTitle")}</div>
+              <button onClick={refreshMachine} disabled={machineBusy}
+                style={{ background: machineBusy ? "var(--border)" : "var(--accent)", border: "none", color: machineBusy ? "var(--text-muted)" : "var(--accent-contrast)", padding: "5px 12px", borderRadius: 4, cursor: machineBusy ? "default" : "pointer", fontSize: 11, fontWeight: 700 }}>
+                {machineBusy ? t("cfMachineScanning") : t("cfMachineRefresh")}
+              </button>
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>{t("cfMachineHint")}</div>
+            <pre style={{ margin: 0, maxHeight: 220, overflowY: "auto", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 10px", fontSize: 10, color: "var(--text-muted)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {machine.trim() || t("cfMachineEmpty")}
+            </pre>
           </div>
         </div>
       )}

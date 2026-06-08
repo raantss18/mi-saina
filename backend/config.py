@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     # Mémoire automatique : extrait en arrière-plan les faits/préférences durables
     # de l'utilisateur et enrichit profile.md (sans [REMEMBER:] explicite).
     AUTO_MEMORY: bool = True
+    # Profil machine : collecte (1er run + à la demande) les chemins XDG réels, la
+    # structure du home et les outils installés → injecté au system prompt.
+    MACHINE_PROFILE: bool = True
+    # Bilan santé périodique : checks read-only (maj, services en échec, disque,
+    # erreurs journal) qui PROPOSENT des actions (n'exécutent jamais rien seuls).
+    HEALTH_MONITOR: bool = True
+    HEALTH_INTERVAL_MIN: int = 30
 
     class Config:
         env_file = str(_ENV_FILE)
@@ -154,6 +161,23 @@ EDITABLE_SETTINGS: dict = {
         "label": "Mémoire automatique",
         "help": "Enrichit automatiquement le profil (profile.md) avec les préférences/faits durables "
                 "détectés au fil des échanges, sans avoir à le demander.",
+    },
+    "MACHINE_PROFILE": {
+        "type": "bool",
+        "label": "Profil machine",
+        "help": "Injecte les chemins réels de l'utilisateur (Téléchargements, Documents…), la structure "
+                "du dossier personnel et les outils installés → l'agent est plus précis. Bouton « Rafraîchir » dans Mémoire.",
+    },
+    "HEALTH_MONITOR": {
+        "type": "bool",
+        "label": "Bilan santé périodique",
+        "help": "Vérifie régulièrement le système (mises à jour, services en échec, disque, erreurs récentes) "
+                "et PROPOSE des actions — n'exécute jamais rien tout seul.",
+    },
+    "HEALTH_INTERVAL_MIN": {
+        "type": "int", "min": 5, "max": 240, "step": 5,
+        "label": "Intervalle du bilan santé (min)",
+        "help": "Fréquence des vérifications de santé (en minutes). Plus haut = moins intrusif.",
     },
 }
 

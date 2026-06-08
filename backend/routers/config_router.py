@@ -39,7 +39,7 @@ def put_system_prompt(body: SystemPromptBody):
 
 
 # ── Contexte utilisateur & profil (locaux, ~/.config/mi-saina) ─────────────────
-from services import userctx  # noqa: E402
+from services import userctx, machine_profile  # noqa: E402
 
 
 class TextBody(BaseModel):
@@ -66,6 +66,23 @@ def get_profile():
 def put_profile(body: TextBody):
     userctx.write_profile(body.content)
     return {"status": "ok"}
+
+
+# ── Profil machine (chemins réels, structure du home, outils) ──────────────────
+
+@router.get("/machine")
+def get_machine():
+    """Profil machine collecté (vide s'il n'a pas encore été généré)."""
+    return {"content": machine_profile.read()}
+
+
+@router.post("/machine/refresh")
+def refresh_machine():
+    """(Re)collecte le profil machine maintenant (read-only, borné)."""
+    try:
+        return {"status": "ok", "content": machine_profile.refresh()}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 
 # ── Réglages modifiables à chaud ───────────────────────────────────────────────

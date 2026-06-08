@@ -23,6 +23,8 @@
 - **Fitadidiana** — fikarohana ara-dikany sy lahatsoratra feno, profil mpampiasa mihamitombo ho azy, rakitra tontolon'ny tetikasa.
 - **Session mitokana** — mahaleo tena ny resaka tsirairay: tsy mifangaro ny session (ny resaka vaovao tsy mandova lohahevitra taloha tsy misy ifandraisany). Mbola azo atao ny fikarohana ara-dikany rehefa ilaina, ao amin'ny barre latérale.
 - **Lahatahiry fiasana isaky ny session** — afaka mametaka lahatahiry amin'ny session (📁 ao amin'ny lohateny): ny baiko shell-ny dia tanterahina **ao anatin'io lahatahiry io** ary ampiasain'ny modely mba ho marina kokoa ny valiny (lalana mifandraika).
+- **Mombamomba ny milina** — angonina amin'ny fiantombohana voalohany ny lalanao marina (Téléchargements, Documents…), ny firafitry ny home sy ny fitaovana voapetraka, mba hiasan'ny mpanampy amin'ny lalana marina fa tsy maminavina. Bokotra « Havaozy » ao amin'ny Config → Mémoire.
+- **Fanaraha-maso fahasalamana (manolotra ihany)** — manamarina tsindraindray ny rafitra (fanavaozana, serivisy tsy mandeha, kapila, hadisoana vao haingana) ary **manolotra** hetsika. Tsy manatanteraka na inona na inona irery — manindry dia mameno ny resaka mba hanamarinanao.
 - **Fenetra desktop** (Tauri) — fampiharana ao amin'ny menu, kisary ao amin'ny barre système rehefa miditra, hitsin-dalana, fampandrenesana, palette baiko ⌘K, loko mazava/maizina/auto, panneau artefacta.
 - **Fiteny maro** — Anglisy, Frantsay, Malagasy (UI + valin'ny mpanampy), safidiana rehefa mametraka ary azo ovaina ao amin'ny konfigirasiona.
 

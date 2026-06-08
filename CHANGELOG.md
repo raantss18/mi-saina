@@ -8,6 +8,16 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.13] - 2026-06-08
+
+### Ajouté — connaissance de la machine & maintenance
+- **Profil machine** (`~/.config/mi-saina/machine.md`) : collecté au 1er démarrage et via un bouton **« Rafraîchir »** (Config → Mémoire). Capture les **chemins XDG réels** de l'utilisateur (résout enfin « Téléchargements » ↔ `~/Downloads` — fini les suppositions de noms), la **structure du dossier personnel** (niveau 1), un **aperçu agrégé** des dossiers standards (compte par type, taille — sans exposer les noms de fichiers) et les **outils installés**. Injecté dans le system prompt → l'agent agit avec les vrais chemins au lieu de deviner. Réglable (`MACHINE_PROFILE`). Read-only, borné, jamais bloquant.
+- **Bilan santé périodique** (propose-only) : toutes les ~30 min (réglable `HEALTH_INTERVAL_MIN`), des vérifications **read-only et sans LLM** — mises à jour disponibles, services systemd en échec, espace disque, erreurs noyau récentes — remontent des **constats avec une action SUGGÉRÉE**. mi-saina **n'exécute jamais rien tout seul** : un bandeau 🩺 propose, et cliquer **« Exécuter »** pré-remplit le chat (tu valides comme d'habitude). Endpoints `/health-monitor/insights` et `/health-monitor/check`, toggle `HEALTH_MONITOR`.
+
+### Corrigé — robustesse de l'exécution
+- **Boucles de répétition** : les petits modèles répétaient parfois 20× la même commande dans une seule réponse. Les commandes identiques sont désormais **dédupliquées** par réponse.
+- **Gabarits entre guillemets** : des templates recopiés comme `xdg-open "full path"` / `"chemin complet"` étaient exécutés ; ils sont désormais **détectés et ignorés** (complète le filtre de placeholders de v1.0.12).
+
 ## [1.0.12] - 2026-06-08
 
 ### Corrigé — sûreté (hallucinations / auto-empoisonnement)
