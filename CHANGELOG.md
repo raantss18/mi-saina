@@ -1,5 +1,13 @@
 # Changelog
 
+Toutes les évolutions notables de **mi-saina** sont documentées ici.
+Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
+versionnage [SemVer](https://semver.org/lang/fr/).
+
+> Les en-têtes de version correspondent aux **releases publiées** sur GitHub
+> (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
+> release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
+
 ## [1.0.10] - 2026-06-08
 
 ### Corrigé
@@ -14,135 +22,137 @@
 - **Barre latérale** : le bouton **« + Nouvelle session »** est désormais un bouton plein (couleur d'accent), nettement détaché de la liste d'historique.
 - **Écran d'accueil** redessiné : héros centré (logo + accroche), section « Essayez un exemple », cartes avec **icône colorée + titre + description**, entièrement traduites (EN/FR/MG).
 
-## [Non publié]
-
-### Ajouté
-- **Outils externes via MCP (Model Context Protocol)** — opt-in : mi-saina peut appeler des outils de serveurs MCP (filesystem, fetch, git…) avec la syntaxe `[MCP: serveur.outil {"arg": "valeur"}]`, en plus des `[EXEC: …]`. Client MCP minimal **sans dépendance** (JSON-RPC sur stdio : initialize → tools/list → tools/call). Serveurs déclarés dans `~/.config/mi-saina/mcp.json` (même format que Claude Desktop, voir `config/mcp.json.example`), activé via `MCP_ENABLED` (défaut **off**) dans l'UI Config. Les outils disponibles sont injectés dans le system prompt ; un serveur absent/mal configuré est ignoré (jamais bloquant). Couvert par `tests/test_mcp_client.py`.
-- **Fusion des micro-étapes du découpage** : les fragments (mot isolé comme « sauvegarde », ou pur référent « compile-le ») sont recollés à l'étape précédente pour éviter de multiplier des sous-tâches inutiles (chaque sous-tâche = un contexte LLM neuf). Les vraies actions verbe+objet restent distinctes. Couvert par `tests/test_planner_refs.py`.
-- **`num_ctx` adaptatif selon la VRAM libre** : la fenêtre de contexte est réduite automatiquement quand la VRAM libre baisse (paliers), bornée par `NUM_CTX` (= plafond souhaité). Détection agnostique du GPU (NVIDIA via `nvidia-smi`, AMD via sysfs `amdgpu`, cache 15 s). Toggle `NUM_CTX_AUTO` (défaut on) dans l'UI Config ; VRAM inconnue → valeur fixe. Couvert par `tests/test_num_ctx.py`.
-- **Auto-complétion clavier des slash-commands** : dans le menu `/…`, navigation ↑/↓, **Tab** ou **Entrée** pour valider l'item surligné, **Échap** pour fermer ; surbrillance synchronisée avec la souris. (Complète l'édition multi-ligne déjà ajoutée.)
-- **Liste cliquable à l'ouverture ambiguë** : quand on demande d'ouvrir un fichier dont le chemin n'existe pas mais que **plusieurs** fichiers proches existent, mi-saina ne devine plus — il propose une **liste cliquable** (modal). L'ouverture se fait sur le fichier choisi. S'il n'y a 0 ou 1 candidat, le flux normal (auto-réparation) opère. Round-trip backend interruptible par ⏹ (comme la fenêtre sudo). Couvert par `tests/test_shell_open_choices.py`.
-- **Bouton « Tout valider »** dans la fenêtre de confirmation : approuve la commande **et toutes les suivantes de la tâche en cours** (utile en mode `CONFIRM_MODE=all` ou pour une tâche multi-commandes risquées). Couvert par `tests/test_chat_confirm.py`.
-- **Tests shell_stream** complétés (GUI `launch_gui`, auto-réparation de chemin) — `tests/test_shell_repair.py`.
-
-### Ajouté
-- **Recherche web exécutée dans la boucle agentique** : le modèle peut émettre `[SEARCH: requête]` et les résultats (titres + URLs + extraits) lui sont **réinjectés** pour poursuivre (avant, `[SEARCH:]` n'ouvrait qu'un panneau côté frontend, sans retour au modèle). Permet d'enchaîner recherche → `fetch` → action.
-- **Consigne de téléchargement** : quand on demande de télécharger des fichiers depuis un site, le modèle est guidé à (1) `fetch` la page pour lire les liens, (2) `wget` les fichiers dans un dossier dédié, en utilisant les URLs exactes.
-- **Modèle d'embeddings dédié (`EMBED_MODEL`)** : la mémoire sémantique utilise désormais un modèle d'embeddings séparé (défaut `nomic-embed-text`) au lieu de `FAST_MODEL`. Beaucoup de modèles génératifs (ex. **gemma3**) ne supportent pas `/api/embeddings` — séparer évite de casser la recherche sémantique quand on choisit un tel modèle pour la génération, et garde un petit modèle d'embeddings (rapide, pas de swap VRAM). À installer une fois : `ollama pull nomic-embed-text`.
+## [1.0.9] - 2026-06-07
 
 ### Corrigé
-- **Recherche web cassée** : le paquet `duckduckgo_search` (déprécié, renommé `ddgs`) ne renvoyait plus aucun résultat. Migration vers `ddgs` (avec repli sur l'ancien nom), erreurs réseau tolérées → liste vide non bloquante. `requirements.txt` mis à jour.
-- **Serveurs MCP lancés via `uvx`/`pipx` ne démarraient pas sous systemd** : le PATH restreint des services utilisateur n'inclut pas `~/.local/bin`, donc un serveur comme `uvx mcp-server-git` était introuvable et échouait silencieusement. Le client MCP élargit désormais le PATH des serveurs (`~/.local/bin`, `~/bin`, `~/.cargo/bin`, `/usr/local/bin`) et résout le binaire via ce PATH ; `install.sh` ajoute aussi ces chemins au service backend. Exemple de serveur **git** ajouté à `config/mcp.json.example`.
-- **MCP activé faisait croire au modèle qu'il n'avait plus accès au terminal** : le bloc d'outils injecté au system prompt était énorme (~4600 caractères de descriptions verbeuses en anglais, « Only works within allowed directories » répété 14×), ce qui noyait l'instruction d'accès shell — un modèle local en concluait qu'il était limité aux outils filesystem. Le bloc est désormais **compact** (1 ligne courte par outil, sans les outils dépréciés, ~1440 caractères) et **rappelle explicitement** que l'accès terminal `[EXEC: …]` reste entier (les outils MCP sont un bonus, pas un remplacement).
-- **Installation : plus d'échec si les ports 8000/3001 sont déjà occupés** — `install.sh` et `start.sh` détectent les ports pris (par un autre service) et basculent automatiquement sur le prochain port libre (jusqu'à +50), au lieu de planter. Les services systemd sont écrits avec le port retenu, et le frontend reçoit l'URL du backend via `NEXT_PUBLIC_API_BASE` (les services mi-saina existants sont stoppés d'abord pour ne pas se détecter eux-mêmes comme conflit). Côté frontend, l'URL du backend est désormais centralisée (`lib/config.ts` : `API_BASE`/`WS_BASE`, défaut `http://localhost:8000`) au lieu d'être codée en dur dans chaque composant — un port backend non standard fonctionne donc de bout en bout. Ports forçables via les variables d'env `BACKEND_PORT`/`FRONTEND_PORT`.
-- **Lancement GUI : vrai succès vs échec, agnostique du bureau** : ouvrir un fichier inexistant est désormais signalé proprement **sans rien lancer** (plus de boîte d'erreur du bureau) ; et quand une fenêtre reste ouverte après le délai de grâce, `stderr` est inspecté avec des signatures d'échec **multi-toolkit** (Qt/GTK/xdg-open/gio, pas seulement KDE) pour distinguer un vrai lancement d'une boîte d'erreur — sans matcher les avertissements bénins de démarrage. Couvert par `tests/test_shell_repair.py`.
-- **Timeout shell tuant les longues commandes (maj système, gros téléchargements)** : `stream_pty` coupait toute commande après **600 s de temps total**, ce qui interrompait un `paru -Syu` de plusieurs Go en plein milieu. Le timeout est désormais basé sur l'**inactivité** : on ne coupe que si la commande ne produit **aucune sortie** pendant `SHELL_IDLE_TIMEOUT` (défaut 600 s, réglable dans l'UI Config). Un téléchargement qui progresse sort en continu → jamais coupé tant qu'il avance (⏹ reste disponible pour arrêter à la main). De plus, l'arrêt sur timeout tue désormais tout le **groupe de processus** (`killpg`/SIGKILL) au lieu du seul shell, pour ne pas laisser `pacman` orphelin. NB : pacman met les paquets complets en cache (`/var/cache/pacman/pkg`), donc une reprise ne re-télécharge que le paquet interrompu.
+- **Ollama Hub réparé** : la **suppression** et le **téléchargement/mise à jour** de modèles fonctionnent à nouveau. Cause : `httpx.AsyncClient.delete()` n'accepte pas de corps JSON → la suppression renvoyait HTTP 500. Passage par `client.request("DELETE", …, json={…})` ; le pull remonte désormais les erreurs explicitement.
 
 ### Ajouté
-- **Résolution de référents entre sous-tâches** : chaque sous-tâche s'exécutant dans un contexte neuf, un pronom qui renvoie à l'étape précédente (« compile-**le** », « ouvre-**la** », « lance ça ») n'avait aucun référent. Désormais (1) le scratch partagé conserve les **commandes concrètes** réussies de chaque étape (pas seulement un résumé textuel), et (2) quand une sous-tâche contient un référent pendant, un indice `[RÉFÉRENCE]` pointant le **dernier artefact** (chemin de fichier produit) est injecté avant la sous-tâche. Détection volontairement stricte (les articles « le/la/les + nom » ne déclenchent rien). Helpers déterministes `has_dangling_reference` / `last_artifact` / `reference_hint` dans `services.planner`, couverts par `tests/test_planner_refs.py`.
+- **Modèles suggérés** : une section propose des modèles populaires d'Ollama **adaptés au matériel** (badge « compatible », budget VRAM estimé via `nvidia-smi`/RAM) avec un bouton « Obtenir », et marque ceux déjà installés. Dans **Config → Modèles** (`/models/suggestions`). Import LM Studio toujours disponible (`/models/import-lmstudio`).
+
+### Modifié
+- **Libellés jolis** dans le sélecteur de modèle (« Qwen 3.5 9B » au lieu de `qwen3.5:9b`).
+- **Barre latérale** : « Nouvelle session » séparée de la liste + en-tête « HISTORIQUE ».
+- **Écran d'accueil** harmonisé (plus de mélange FR/EN), logo centré.
+- **Titre de la session** affiché en haut de la discussion.
+
+## [1.0.8] - 2026-06-07
+
+### Modifié
+- **Interface réorganisée** :
+  - 📚 **Barre latérale = historique uniquement** (sessions + recherche + nouvelle session).
+  - ⬇️ **Sélecteur de modèle** en liste déroulante dans le header (à côté de « modèle : ») pour changer de modèle d'un clic.
+  - ⚙️ **Config & Tâches** en boutons dans le header. La gestion avancée des modèles (télécharger / mettre à jour / supprimer / importer LM Studio) devient un **onglet « Modèles » dans Config**.
+  - 🧹 Retrait des icônes régénérer / copier / supprimer du header — déjà présentes **sous chaque message**.
+
+## [1.0.7] - 2026-06-07
+
+### Corrigé
+- **Réponses précises** : correction d'un bug où l'assistant répondait parfois à une **ancienne question** au lieu de la demande actuelle. La mémoire n'est plus injectée que si elle dépasse un **seuil de similarité** (`build_context_prefix(min_score=0.62)`), et le system prompt cadre le modèle pour ne traiter que la dernière demande sans rien inventer. *(Remplacé en v1.0.10 par une isolation totale des sessions.)*
+- **Dates de session** : fini le décalage de plusieurs heures (les dates UTC naïves sont désormais marquées UTC via `_utc_iso`, pour une conversion correcte côté navigateur).
+
+### Ajouté
+- **Raisonnement repliable** : le « raisonnement » du modèle s'affiche dans un menu déroulant (`<details>`, réduit par défaut) au lieu d'une réponse.
+- **Actions par message** : copier / régénérer / supprimer sous chaque message.
+
+### Modifié
+- **Une seule barre de recherche** (plein-texte + sémantique combinés) dans la barre latérale.
+
+## [1.0.6] - 2026-06-07
+
+### Ajouté
+- **Outils externes via MCP (Model Context Protocol)** — opt-in : mi-saina peut appeler des outils de serveurs MCP (filesystem, fetch, git…) avec la syntaxe `[MCP: serveur.outil {"arg": "valeur"}]`, en plus des `[EXEC: …]`. Client MCP minimal **sans dépendance** (JSON-RPC sur stdio : initialize → tools/list → tools/call). Serveurs déclarés dans `~/.config/mi-saina/mcp.json` (même format que Claude Desktop, voir `config/mcp.json.example`), activé via `MCP_ENABLED` (défaut **off**) dans l'UI Config. Les outils disponibles sont injectés dans le system prompt ; un serveur absent/mal configuré est ignoré (jamais bloquant). Le serveur web **fetch** est auto-configuré à l'installation. Couvert par `tests/test_mcp_client.py`.
+- **Recherche web exécutée dans la boucle agentique** : le modèle peut émettre `[SEARCH: requête]` et les résultats (titres + URLs + extraits) lui sont **réinjectés** pour poursuivre (avant, `[SEARCH:]` n'ouvrait qu'un panneau côté frontend). Permet d'enchaîner recherche → `fetch` → action. Avec **consigne de téléchargement** : pour télécharger des fichiers depuis un site, le modèle est guidé à (1) `fetch` la page pour lire les liens, (2) `wget` les fichiers dans un dossier dédié.
+- **Modèle d'embeddings dédié (`EMBED_MODEL`)** : la mémoire sémantique utilise désormais un modèle d'embeddings séparé (défaut `nomic-embed-text`) au lieu de `FAST_MODEL`. Beaucoup de modèles génératifs (ex. **gemma3**) ne supportent pas `/api/embeddings` — séparer évite de casser la recherche sémantique. À installer une fois : `ollama pull nomic-embed-text`.
+- **`num_ctx` adaptatif selon la VRAM libre** : la fenêtre de contexte est réduite automatiquement quand la VRAM libre baisse (paliers), bornée par `NUM_CTX`. Détection agnostique du GPU (NVIDIA `nvidia-smi`, AMD sysfs `amdgpu`, cache 15 s). Toggle `NUM_CTX_AUTO` (défaut on). Couvert par `tests/test_num_ctx.py`.
+- **Résolution de référents entre sous-tâches** : un pronom renvoyant à l'étape précédente (« compile-**le** », « ouvre-**la** ») reçoit un référent — le scratch partagé conserve les **commandes concrètes** réussies, et un indice `[RÉFÉRENCE]` pointant le **dernier artefact** est injecté. Détection stricte. Helpers `has_dangling_reference` / `last_artifact` / `reference_hint` dans `services.planner`, couverts par `tests/test_planner_refs.py`.
+- **Fusion des micro-étapes du découpage** : les fragments (mot isolé, pur référent) sont recollés à l'étape précédente pour éviter de multiplier des sous-tâches inutiles. Couvert par `tests/test_planner_refs.py`.
+- **Auto-complétion clavier des slash-commands** : navigation ↑/↓, **Tab/Entrée** pour valider, **Échap** pour fermer ; surbrillance synchronisée avec la souris.
+- **Liste cliquable à l'ouverture ambiguë** : quand plusieurs fichiers proches existent, mi-saina propose une **liste cliquable** (modal) au lieu de deviner. Round-trip backend interruptible par ⏹. Couvert par `tests/test_shell_open_choices.py`.
+- **Bouton « Tout valider »** dans la fenêtre de confirmation : approuve la commande **et toutes les suivantes de la tâche en cours**. Couvert par `tests/test_chat_confirm.py`.
+
+### Corrigé
+- **Résumé de pages web fiable** : le fetch accepte une URL telle quelle (sans `https://`, guillemets « courbes »…) et récupère le **bon** site — fini le mélange avec un site demandé précédemment. Parsing tolérant : `parse_calls` accepte URL nue, `https://` auto, guillemets normalisés.
+- **Recherche web cassée** : le paquet `duckduckgo_search` (déprécié, renommé `ddgs`) ne renvoyait plus de résultats. Migration vers `ddgs` (repli sur l'ancien nom), erreurs réseau tolérées → liste vide non bloquante.
+- **Serveurs MCP via `uvx`/`pipx` ne démarraient pas sous systemd** : le PATH restreint des services utilisateur n'inclut pas `~/.local/bin`. Le client MCP élargit le PATH (`~/.local/bin`, `~/bin`, `~/.cargo/bin`, `/usr/local/bin`) ; `install.sh` ajoute aussi ces chemins au service backend. Exemple **git** ajouté à `config/mcp.json.example`.
+- **MCP activé faisait croire au modèle qu'il n'avait plus accès au terminal** : le bloc d'outils injecté était énorme (~4600 caractères). Il est désormais **compact** (1 ligne courte par outil, ~1440 caractères) et **rappelle explicitement** que l'accès terminal `[EXEC: …]` reste entier.
+- **Ports 8000/3001 déjà occupés** : `install.sh`/`start.sh` détectent les ports pris et basculent automatiquement sur le prochain port libre (jusqu'à +50). L'URL du backend est centralisée (`lib/config.ts` : `API_BASE`/`WS_BASE`). Ports forçables via `BACKEND_PORT`/`FRONTEND_PORT`.
+- **Lancement GUI : vrai succès vs échec, agnostique du bureau** : ouvrir un fichier inexistant est signalé sans rien lancer ; `stderr` inspecté avec des signatures d'échec **multi-toolkit** (Qt/GTK/xdg-open/gio). Couvert par `tests/test_shell_repair.py`.
+- **Timeout shell tuant les longues commandes** (maj système, gros téléchargements) : `stream_pty` coupe désormais sur **inactivité** (`SHELL_IDLE_TIMEOUT`, défaut 600 s) et non plus sur le temps total — un `paru -Syu` de plusieurs Go n'est plus interrompu tant qu'il progresse. L'arrêt tue tout le **groupe de processus** (`killpg`/SIGKILL).
 
 ### Supprimé
-- **Endpoint REST `POST /chat/complete`** (et le modèle `ChatRequest`) : code mort et divergent — le frontend ne passe que par le WebSocket `/chat/ws`. Ce chemin ne disposait ni de la boucle agentique, ni de la gestion GUI, ni de la validation/sudo, et constituait un piège (comportement différent du WS). Retiré ; `services.shell_exec.execute_command` reste utilisé par l'endpoint `/shell`.
+- **Endpoint REST `POST /chat/complete`** (et le modèle `ChatRequest`) : code mort et divergent — le frontend ne passe que par le WebSocket `/chat/ws`. `services.shell_exec.execute_command` reste utilisé par l'endpoint `/shell`.
 
-## [1.6.1] - 2026-06-05
+## [1.0.5] - 2026-06-07
+
+### Ajouté
+- **Interface entièrement traduite** (English / Français / Malagasy) — tous les panneaux.
+- **Rendu Markdown des réponses** : titres, listes, **gras**, code, **tableaux**, liens (plus de markdown brut).
 
 ### Corrigé
-- **`stop` pendant l'attente du mot de passe sudo** : une fois le prompt sudo affiché, le PTY avait rendu la main et l'attente du mot de passe (`sudo_q.get()`) n'écoutait plus le signal d'arrêt → un clic sur ⏹ (ou une déconnexion) restait sans effet jusqu'au timeout de 120 s. L'attente du mot de passe court désormais contre `stop_event` (`asyncio.wait` / FIRST_COMPLETED) : un stop ou une déconnexion interrompt immédiatement (le terminal passe en `stopped` et la tâche s'arrête). Le bouton « Annuler » du modal sudo envoie maintenant un vrai `stop` au backend. Couvert par `tests/test_chat_sudo.py`.
-- **Bouton ⏹ qui disparaissait en plein milieu d'une tâche** : l'état `streaming` du frontend retombait à `false` dès qu'une commande se terminait (`shell_done`), alors que la boucle agentique continuait (réinjection de la sortie au modèle, commandes suivantes). `shell_done` ne modifie plus `streaming` ; seuls les events terminaux `done`/`stopped` le remettent à false.
+- Le badge « modèle » affiche désormais le modèle réellement actif (fini le `magistral:small` codé en dur).
 
-## [1.6.0] - 2026-06-05
-
-### Ajouté
-- **Résumé de l'historique élagué** : sur les longues sessions, `fit_budget` ne **coupe** plus net les vieux messages — il en insère un **résumé extractif déterministe** (sans appel LLM, donc 0 swap VRAM) : 1 ligne par message (texte tronqué + commandes `[EXEC:]` conservées), borné à ~1/6 du budget de contexte. Si le résumé déborde, il **préserve l'origine de la session** (l'intention initiale) plutôt que les échanges récents déjà couverts par la fenêtre conservée. Réglable via `CONTEXT_DIGEST` (activé par défaut). Couvert par `tests/test_planner.py`.
-- **Détection de statut fine** : le succès/échec d'une commande ne dépend plus du seul code retour. `diagnostics.assess_outcome()` analyse aussi la **sortie** pour repérer les **échecs logiques renvoyant pourtant 0** (suites de tests « N failed / failing », `Traceback`, `panic:`, `BUILD FAILED`, `error:` gcc/clang/rust, eslint « ✖ N problems (N errors) », rspec…), avec garde anti-faux-positifs (« 0 errors », « no failures », « all tests passed »…). L'échec logique est affiché dans le terminal (« ✗ échec logique (rc=0) » + raison), injecté au modèle pour qu'il corrige, et compté comme échec pour l'apprentissage de compétences. Couvert par `tests/test_diagnostics.py`.
-
-## [1.5.0] - 2026-06-04
+## [1.0.4] - 2026-06-07
 
 ### Ajouté
-- **Planificateur de tâches local** : crée des tâches récurrentes (toutes les X min / chaque jour / chaque semaine) exécutées en arrière-plan, **headless et sûres** (commandes root/destructrices ignorées faute de validation). Résultats consultables dans une session « ⏰ ». Panneau **⏰ Tâches** + endpoints `/schedule`.
-- **Interrupt-redirect** : envoie un message pendant qu'une tâche tourne → il est injecté comme nouvelle instruction (sans tout arrêter). Notice « ↪ Nouvelle instruction prise en compte ».
-- **Auto-correction des compétences** : si une compétence (`/slash`) échoue puis est corrigée par l'agent, mi-saina propose de **mettre à jour la compétence** avec la version qui a marché.
+- **Multilingue** : English / Français / Malagasy — interface + réponses de l'assistant. Choisi à l'installation (défaut anglais), modifiable dans **Config → Réglages**.
+- **Capture d'écran** : bouton qui capture l'écran pour le faire analyser par un modèle vision.
+- **Panneau Artefacts** : épingle automatiquement les blocs de code des réponses (+ copier/télécharger).
+- **Mémoire automatique** : le profil s'enrichit tout seul des faits durables (réglable).
+
+### Modifié
+- **System prompt** réécrit : compact, généraliste (toutes distros), précis — meilleur avec les petits modèles.
+
+## [1.0.3] - 2026-06-07
+
+### Ajouté
+- **Base documentaire (RAG)** : indexe un dossier de documents (PDF, Word, Excel, PowerPoint, texte) et pose des questions sur **tes propres documents**. **Config → Mémoire → Base documentaire**. mi-saina retrouve les passages pertinents et **cite les fichiers source** automatiquement (ou via `[RAG: …]`). 100 % local (embeddings `nomic-embed-text`).
+
+## [1.0.2] - 2026-06-07
+
+### Ajouté
+- **Lecture de documents** : mi-saina lit et résume les **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV** et fichiers texte/code. Joins un document (📎) → contenu extrait automatiquement, ou « résume ce PDF : /chemin… » → directive `[READ: chemin]`.
+- **Réglages de raisonnement** (Config → Réglages) : `THINK` (auto/on/off) + chat épuré (masquage du `<think>`).
+
+### Corrigé
+- Robustesse : message clair en cas d'erreur de modèle (plus de coupure).
+
+## [1.0.1] - 2026-06-07
+
+### Sécurité
+- Backend et frontend **bindés sur 127.0.0.1** uniquement (plus d'exposition réseau).
+- **Anti-CSWSH** : le WebSocket valide l'origine (un site malveillant local ne peut plus piloter le shell).
+- **Anti-CSRF/DNS-rebinding** : middleware HTTP qui refuse les origines navigateur distantes.
+- **Blocklist shell renforcée** (`rm -rf /`, `--no-preserve-root`, `chmod -R 777 /`, écritures disque…).
+- **Auto-update durci** (plus d'`os.system`, dossier temporaire privé, lancement sans shell).
+
+## [1.0.0] - 2026-06-06
+
+> Première **release publique** (installeur `.run` + fenêtre desktop). Consolide tout
+> le travail d'ingénierie des 3–5 juin (boucle agentique, planification, multi-distro,
+> compétences, planificateur, mémoire, diagnostics…).
+
+### Application & distribution
+- **Fenêtre desktop native** (Tauri) : appli dans le menu Applications, **icône dans la barre système** au démarrage, raccourci global **Ctrl+Alt+M**, notifications, palette de commandes ⌘K, thème clair/sombre/auto, panneau artefacts. Le backend est démarré/arrêté automatiquement par l'appli.
+- **Installeur `.run`** auto-extractible (installe Ollama, télécharge un modèle adapté au matériel, installe dans `/opt/mi-saina`, ajoute au menu + démarrage) + **mise à jour intégrée** (Config → Réglages → Mettre à jour) + **import des modèles depuis LM Studio**.
+- **Installation multi-distributions** : `install.sh` détecte la distribution (Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine) et adapte l'installation des dépendances. Choix du modèle selon RAM/VRAM (big/mid/small). Services systemd `mi-saina-backend` / `mi-saina-frontend`.
+
+### Agent & exécution
+- **Cœur** : assistant IA local (Ollama) avec backend FastAPI, frontend Next.js, exécution shell en **PTY temps réel**, mémoire sémantique SQLite, gestion des modèles, skills, pièces jointes, recherche web.
+- **Boucle agentique multi-étapes** : la sortie de chaque commande `[EXEC:]` est renvoyée au modèle, qui peut enchaîner (ex. `find` un fichier puis l'ouvrir). Plafond `MAX_AGENT_STEPS` (défaut 6).
+- **Planification & sous-agents** : les tâches lourdes sont découpées en sous-tâches, chacune exécutée par un **sous-agent à contexte frais et minimal** (adapté aux petites VRAM). Découpage par règles par défaut ; planificateur LLM optionnel (`PLANNER_USE_LLM`). Affichage du plan et de la progression.
+- **Garde-fou de contexte** : budget de tokens avec élagage de l'historique ; **résumé extractif déterministe** des vieux messages (`CONTEXT_DIGEST`, sans appel LLM) qui préserve l'intention initiale de la session.
+- **Validation avant exécution** (`CONFIRM_MODE` : `risky` par défaut / `all` / `never`) : modale Exécuter/Refuser pour les commandes destructrices ; les commandes root restent validées par le mot de passe sudo (jamais stocké). **Stop réel** : ⏹ envoie SIGINT puis SIGKILL au groupe de processus.
+- **Détection de statut fine** : `diagnostics.assess_outcome()` analyse la sortie pour repérer les **échecs logiques renvoyant pourtant 0** (tests « N failed », `Traceback`, `panic:`, `BUILD FAILED`, erreurs gcc/clang/rust/eslint…), avec garde anti-faux-positifs.
+- **Vigilance sur la sortie du terminal** : ~35 motifs d'erreur diagnostiqués (pacman, dépendances, keyring, réseau/DNS, droits, disque, OOM, git, Python/pip & PEP 668, Node/npm, ports, Rust/Cargo, Go, make, Docker, systemd…) avec bannière d'alerte et bouton « Arrêter et corriger ».
+- **Adaptation distro à l'exécution** : matériel et gestionnaire de paquets détectés au runtime (`services/sysinfo.py`) et injectés dans le system prompt — commandes update/install/search toujours correctes pour la distribution courante.
+
+### Productivité
+- **Compétences apprises** : après une tâche réussie (≥2 commandes OK), proposition d'enregistrer une **compétence réutilisable** (`/slash`). **Auto-correction** : une compétence qui échoue puis se corrige peut être mise à jour.
+- **Planificateur de tâches local** : tâches récurrentes (X min / jour / semaine), exécution headless et sûre, panneau **⏰ Tâches** + endpoints `/schedule`.
+- **Interrupt-redirect** : un message envoyé pendant une tâche est injecté comme nouvelle instruction (sans tout arrêter).
+- **Mémoire & contexte** : recherche **sémantique** + **plein-texte (SQLite FTS5)** de l'historique ; **profil utilisateur** persistant via `[REMEMBER: …]` (`profile.md`) ; **fichiers de contexte** `~/.config/mi-saina/context.md` (global) et `MISAINA.md`/`README.md` de projet, injectés automatiquement. Éditables dans l'onglet **Mémoire**.
+- **Lancement & ouverture de fichiers** : applications graphiques détachées avec remontée d'erreur ; **résolution d'applis par nom approximatif** (~350 entrées .desktop + Flatpak) ; **auto-réparation de chemin** ; routage par type de fichier (xdg-mime : PDF → okular, `.tex` → texstudio, code → kate).
 
 ### Notes
-- **Sous-agents parallèles : non retenu** pour l'instant. Sur une seule carte 8 Go, Ollama sérialise les générations → le parallélisme n'accélère pas (et complique la validation/sudo simultanés). Le découpage séquentiel reste le bon choix local. (Voir TODO.)
-
-
-Toutes les évolutions notables de **mi-saina** sont documentées ici.
-Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ;
-versionnage [SemVer](https://semver.org/lang/fr/).
-
-## [1.4.0] - 2026-06-04
-
-### Ajouté
-- **Compétences apprises** (inspiré de hermes-agent, adapté local) : après une tâche réussie (≥2 commandes exécutées avec succès), mi-saina propose de l'enregistrer comme **compétence réutilisable** (`/slash`) construite à partir des commandes. Réutilisable ensuite depuis le menu des skills.
-- **Recherche plein-texte de l'historique (SQLite FTS5)** : section « Recherche dans l'historique » du panneau sessions — retrouve une ancienne conversation par mot-clé (extraits surlignés) et l'ouvre d'un clic. Vient compléter la recherche sémantique.
-- **Fichiers de contexte** : un `~/.config/mi-saina/context.md` (instructions/contexte persistants) et un `MISAINA.md`/`README.md` de projet (dossier `PROJECT_DIR`) sont injectés automatiquement dans le prompt. Éditables via l'onglet **Mémoire** du panneau Config.
-- **Profil utilisateur persistant** : l'assistant mémorise des préférences/faits durables via `[REMEMBER: …]` dans `~/.config/mi-saina/profile.md`, réinjectés à chaque conversation (notice « 🧠 Mémorisé »). Éditable dans l'onglet Mémoire. Endpoints `/config/context` et `/config/profile`.
-- Analyse de hermes-agent et feuille de route (TODO) des fonctionnalités à reprendre en restant **local & simple**.
-
-### Modifié
-- **Confirmation allégée** (`CONFIRM_MODE`) : par défaut `risky` — la fenêtre Exécuter/Refuser n'apparaît plus que pour les commandes **destructrices/irréversibles** (rm, dd, mkfs, kill, git reset --hard, push --force…). Les commandes root restent validées par le mot de passe sudo (plus de double pop-up). Modes : `risky` / `all` / `never`.
-
-## [1.3.0] - 2026-06-04
-
-### Ajouté
-- **Installation multi-distributions** : `install.sh` détecte la distribution (Arch/EndeavourOS, Debian/Ubuntu, Fedora/RHEL, openSUSE, Void, Alpine) et adapte automatiquement l'installation des dépendances. Installation **sur place** (dans le dépôt cloné), sans duplication ni données personnelles.
-- **Choix du modèle selon le matériel** : `install.sh` détecte RAM/VRAM, recommande un palier (big/mid/small) et propose Qwen / DeepSeek / Gemma (ou un tag personnalisé), puis configure `.env`.
-- **Adaptation distro à l'exécution** : le matériel et le gestionnaire de paquets sont détectés au runtime (`services/sysinfo.py`) et injectés dans le system prompt — les commandes update/install/search sont toujours correctes pour la distribution courante. Le system prompt versionné est désormais **générique** (aucune spec matérielle personnelle).
-- **Vigilance étendue** : ~35 motifs d'erreur diagnostiqués (pacman, dépendances, keyring, réseau/DNS, droits, disque, OOM, git, Python/pip & PEP 668, Node/npm, ports, Rust/Cargo, Go, make/compilation, Docker, systemd…).
-
-### Modifié
-- System prompt : section paquets rendue distro-agnostique (s'appuie sur le bloc « SYSTÈME détecté »).
-
-## [1.2.0] - 2026-06-04
-
-### Ajouté
-- **Planification & sous-agents** : les tâches « lourdes » (plusieurs actions enchaînées) sont automatiquement découpées en sous-tâches, chacune exécutée par un **sous-agent à contexte frais et minimal** — adapté aux petites VRAM (RTX 4060 8 Go). Découpage **par règles** (instantané, zéro swap de modèle) par défaut ; planificateur LLM optionnel (`PLANNER_USE_LLM`).
-- **Garde-fou de contexte** : budget de tokens (`MAX_CONTEXT_TOKENS`) avec élagage de l'historique avant chaque appel ; fenêtre de contexte bornée (`NUM_CTX`).
-- Affichage du **plan** et de la **progression des étapes** dans l'interface.
-- **Panneau Terminal** optionnel (activable/désactivable, à côté du chat) : sortie agrégée en direct de toutes les commandes.
-- **Statut de tâche** lu depuis les codes de retour : *en cours* / *succès* / *échec* / *arrêté*, affiché dans l'en-tête et le panneau Terminal.
-- **Résolution d'applications par nom approximatif** : catalogue des applis installées (.desktop + Flatpak, ~350 entrées) avec correspondance floue sur le nom, l'identifiant, le binaire, le nom générique et les mots-clés (multilingue). Ex. « mission-center » → appli « Mission Center » (binaire `missioncenter`) ; « gestionnaire de fichiers » → Dolphin ; « machine virtuelle » → virt-manager. Évite l'exécution brute d'un binaire inexistant.
-
-### Ajouté
-- **Stop tue réellement le processus** : le bouton ⏹ envoie un Ctrl+C (SIGINT) au groupe de processus du terminal via le PTY — arrête proprement `paru`/`pacman` (y compris leurs enfants root) — puis force (SIGKILL) si nécessaire. Stoppe aussi la chaîne agentique en cours.
-- **Vigilance sur la sortie du terminal** : détection en temps réel de problèmes connus (verrou pacman périmé, droits manquants, disque plein, keyring, erreurs réseau/miroir, paquet/commande introuvable) avec **bannière d'alerte** et bouton « Arrêter et corriger » (lance la commande corrective via la validation habituelle). Le diagnostic est aussi transmis au modèle pour qu'il propose lui-même la correction.
-
-### Corrigé
-- **Saisie interactive depuis le panneau Terminal** : il était en lecture seule ; on peut maintenant répondre aux prompts (`[Y/n]`, etc.) directement depuis le panneau, en plus du bloc terminal du chat.
-- **Bloc terminal en double** lors d'une commande root : le passage par la fenêtre de mot de passe sudo créait un second bloc (le 1er restait « en cours » vide). Une seule et même zone terminal est désormais réutilisée.
-- **Historique des conversations** : les anciennes sessions s'affichaient vides alors que les messages étaient bien en base. Sélectionner une session charge désormais son fil via `GET /memory/sessions/{id}/messages`.
-- Curseur clignotant affiché dans **toutes** les bulles assistant lors d'une tâche multi-étapes : il ne s'affiche plus que sur le message en cours.
-- **Routage automatique par type de fichier** : `xdg-open` route vers okular (PDF/livres), texstudio (`.tex`), kate (code/texte) ; associations xdg-mime posées ; recette « projet LaTeX = ouvrir le `main.tex` ».
-
-### Modifié
-- Boucle agentique extraite en fonction réutilisable (chemin principal et sous-agents).
-- **Rebranding LocalMind → mi-saina** : titre API, écran d'accueil, prompts par défaut.
-
-## [1.1.0] - 2026-06-04
-
-### Ajouté
-- **Boucle agentique multi-étapes** : la sortie de chaque commande `[EXEC:]` est renvoyée au modèle, qui peut enchaîner (ex. `find` un fichier puis l'ouvrir). Plafond `MAX_AGENT_STEPS` (défaut 6).
-- **Validation avant exécution** (`CONFIRM_BEFORE_EXEC`) : modale **Exécuter / Refuser** avant chaque commande ; un refus stoppe la chaîne.
-- **Lancement détaché des applications graphiques** (`setsid -w`) avec remontée des erreurs (code retour + message).
-- **Auto-réparation de chemin** à l'ouverture : un nom inexistant (apostrophe typographique, espaces multiples mal retapés) est résolu vers le vrai fichier le plus proche du dossier.
-- **Routage automatique par type de fichier** (xdg-mime) : PDF → okular, `.tex` → texstudio, code/texte → kate.
-- Recettes par domaine dans le system prompt : projets & code, build & run (latexmk, python, npm, cargo, go, jupyter), VM (virt-manager) & conteneurs (podman), système & fichiers.
-- Skills `/update` (`paru -Syu`), `/vm`, `/projects`.
-- Réglages `CONFIRM_BEFORE_EXEC` et `MAX_AGENT_STEPS` (config + `.env`).
-
-### Modifié
-- System prompt réécrit dans un style proche de Claude Code, avec règles Arch/EndeavourOS (pacman/paru, jamais apt/dnf), distinction CLI/GUI et ouverture de fichiers robuste.
-- Détection root élargie (`paru`, `yay`, `pacman -S/R/U/D`, `systemctl …`) ; mot de passe sudo injecté à la détection du prompt `[sudo] password for` (fonctionne aussi pour les aides AUR).
-- `--noconfirm` retiré automatiquement (le `[Y/n]` reste interactif) ; `sudo` retiré devant `paru`/`yay`.
-- Source unique : services systemd renommés `mi-saina-backend` / `mi-saina-frontend`, pointant vers le dépôt git ; venv via symlink `~/mi-saina-env`.
-
-### Corrigé
-- Race condition : la réponse au mot de passe sudo (`sudo_response`) pouvait être « mangée » par le routage stdin → queue dédiée.
-- Bug `cmd.lstrip("sudo")` (supprimait des caractères au lieu du préfixe) dans le chemin non-streaming.
-- Ouverture de fichiers aux noms complexes qui échouait silencieusement (faux « lancée »).
-
-## [1.0.0] - 2026-06-03
-
-### Ajouté
-- Version initiale : assistant IA local (Ollama) avec backend FastAPI, frontend Next.js, exécution shell en PTY temps réel, mémoire sémantique SQLite, gestion des modèles, skills, pièces jointes, recherche web DuckDuckGo, services systemd.
+- **Sous-agents parallèles : non retenu** — sur une seule carte 8 Go, Ollama sérialise les générations (aucun gain) et le parallélisme casse la validation/sudo simultanés. Le découpage séquentiel reste optimal en local.
