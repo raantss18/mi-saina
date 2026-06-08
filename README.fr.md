@@ -21,6 +21,8 @@
 - **Lecture de documents** — résume/analyse des **PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), CSV** et fichiers texte/code (joins-les, ou demande « résume ce PDF : … » → directive `[READ: chemin]`).
 - **Base documentaire (RAG)** — indexe un dossier (PDF/Word/Excel/PowerPoint/texte) et pose des questions sur **tes documents** ; les passages pertinents sont retrouvés et cités automatiquement. 100 % local (embeddings `nomic-embed-text`).
 - **Mémoire** — recherche sémantique + plein-texte de l'historique, profil utilisateur persistant, fichiers de contexte de projet.
+- **Sessions isolées** — chaque conversation est autonome : aucun débordement entre sessions (un nouveau chat n'hérite jamais d'un sujet passé sans rapport). La recherche sémantique reste accessible à la demande depuis la barre latérale.
+- **Dossier de travail par session** — attache un dossier à une session (📁 dans l'en-tête) : ses commandes shell s'exécutent **dans ce dossier** et le modèle l'utilise pour des réponses plus précises (chemins relatifs).
 - **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
 - **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
 - **Fenêtre desktop native** (Tauri) — appli dans le menu Applications, **icône dans la barre système** au démarrage, raccourci global, notifications, palette de commandes ⌘K, thème clair/sombre/auto. Indépendante du navigateur et du bureau (KDE/GNOME/XFCE/Wayland).
@@ -250,6 +252,10 @@ Tape `/` dans le champ pour voir les raccourcis (navigation au clavier ↑/↓, 
 | `/explain` | Explique la dernière commande |
 
 Crée tes propres skills dans **⚙ Config → Skills**.
+
+### Dossier de travail
+
+Clique sur **📁** dans l'en-tête du chat pour attacher un dossier à la session courante. Les commandes s'exécutent alors dedans : tu peux dire *« liste les fichiers ici »* ou *« compile ce projet »* sans répéter le chemin complet.
 
 ### Commandes nécessitant les droits root
 

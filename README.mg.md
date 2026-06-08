@@ -21,6 +21,8 @@
 - **Banky angona (RAG)** — alaharo lahatahiry iray ary manontania momba ny **antontan-taratasinao manokana**; tadiavina sy lazaina ho azy ny andalana mifanaraka. An-toerana 100%.
 - **Sary efijery → fahitana** — alaivo sary ny efijery ary asaivo dinihin'ny modely vision.
 - **Fitadidiana** — fikarohana ara-dikany sy lahatsoratra feno, profil mpampiasa mihamitombo ho azy, rakitra tontolon'ny tetikasa.
+- **Session mitokana** — mahaleo tena ny resaka tsirairay: tsy mifangaro ny session (ny resaka vaovao tsy mandova lohahevitra taloha tsy misy ifandraisany). Mbola azo atao ny fikarohana ara-dikany rehefa ilaina, ao amin'ny barre latérale.
+- **Lahatahiry fiasana isaky ny session** — afaka mametaka lahatahiry amin'ny session (📁 ao amin'ny lohateny): ny baiko shell-ny dia tanterahina **ao anatin'io lahatahiry io** ary ampiasain'ny modely mba ho marina kokoa ny valiny (lalana mifandraika).
 - **Fenetra desktop** (Tauri) — fampiharana ao amin'ny menu, kisary ao amin'ny barre système rehefa miditra, hitsin-dalana, fampandrenesana, palette baiko ⌘K, loko mazava/maizina/auto, panneau artefacta.
 - **Fiteny maro** — Anglisy, Frantsay, Malagasy (UI + valin'ny mpanampy), safidiana rehefa mametraka ary azo ovaina ao amin'ny konfigirasiona.
 
@@ -84,6 +86,9 @@ Aorian'ny fametrahana, fampiharana tena izy i mi-saina: alefaso **"mi-saina"** a
 
 ### Skills (hitsin-dalana `/`)
 Soraty `/` ao amin'ny resaka ho an'ny hitsin-dalana azo averina. Mamorona ny anao ao amin'ny **Config → Skills**.
+
+### Lahatahiry fiasana
+Tsindrio ny **📁** ao amin'ny lohatenin'ny resaka mba hametaka lahatahiry amin'ny session ankehitriny. Ny baiko dia tanterahina ao anatiny: azonao lazaina hoe *"lazao ny rakitra eto"* na *"amboary ity tetikasa ity"* nefa tsy mamerina ny lalana feno.
 
 ---
 

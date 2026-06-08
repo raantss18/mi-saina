@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.10] - 2026-06-08
+
+### Corrigé
+- **Confusion entre sessions (« contexte qui bave »)** : une nouvelle session pouvait recevoir, par erreur, des extraits d'**autres** sessions (ex. une question « usage disque » renvoyait une réponse sur les **processus** d'une session passée). Cause : `build_context_prefix` injectait à chaque message les extraits sémantiques les « moins éloignés » d'autres conversations, que le petit modèle local prenait pour la tâche en cours. L'injection cross-session est **supprimée de la boucle de chat** : une session = *system prompt + profil/contexte global + historique de **cette** session* uniquement. La recherche sémantique reste disponible, mais seulement dans la **barre de recherche** de la barre latérale (là où c'est explicitement demandé). Validé par un test déterministe (zéro fuite) + un test live de bout en bout.
+- **Raisonnement stocké en mémoire** : les blocs `<think>…</think>` sont désormais **retirés avant l'enregistrement** des réponses de l'assistant (`_clean_for_store`). La mémoire et les embeddings restent propres → plus de pollution inter-sessions à terme. Couvert par `tests/test_routers.py`.
+
+### Ajouté
+- **Dossier de travail par session** : bouton **📁** dans l'en-tête du chat pour attacher un dossier à une session. Les commandes shell de cette session s'exécutent **dans ce dossier** (`cwd` passé jusqu'à `stream_pty`) et le modèle en est informé (indice de contexte) → réponses plus précises avec chemins relatifs. Nouvelle colonne `working_dir` (migration auto sur base existante), endpoint `PUT /memory/sessions/{id}/working-dir` (dossier inexistant rejeté sans écraser l'ancien, `path:""` pour effacer). Fonctionne même depuis l'écran d'accueil (la session est créée à la volée). Couvert par `tests/test_routers.py`.
+
+### Modifié
+- **En-tête du chat** : le **titre auto-généré de la session** s'affiche dans l'espace libre de l'en-tête (à côté du modèle/Config/Tâches), au lieu d'une ligne séparée en dessous.
+- **Barre latérale** : le bouton **« + Nouvelle session »** est désormais un bouton plein (couleur d'accent), nettement détaché de la liste d'historique.
+- **Écran d'accueil** redessiné : héros centré (logo + accroche), section « Essayez un exemple », cartes avec **icône colorée + titre + description**, entièrement traduites (EN/FR/MG).
+
 ## [Non publié]
 
 ### Ajouté

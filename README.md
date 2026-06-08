@@ -21,6 +21,8 @@
 - **Knowledge base (RAG)** — index a folder and ask questions about **your own documents**; relevant passages are retrieved and cited automatically. 100% local.
 - **Screen capture → vision** — capture your screen and have a vision model analyze it.
 - **Memory** — semantic + full-text search of history, an auto-built user profile, project context files.
+- **Isolated sessions** — each conversation is self-contained: no cross-session bleed (a new chat never inherits an unrelated past topic). Semantic recall stays available on demand from the sidebar search.
+- **Per-session working folder** — attach a folder to a session (📁 in the header): its shell commands run **inside that folder** and the model uses it for more precise, relative-path answers.
 - **Native desktop window** (Tauri) — app in your application menu, **system-tray icon** at startup, global shortcut, notifications, ⌘K command palette, light/dark/auto theme, artifacts panel.
 - **Multilingual** — English, French, Malagasy (UI + assistant replies), chosen at install and changeable in settings.
 
@@ -86,6 +88,9 @@ After install, mi-saina is a real app: launch **"mi-saina"** from your menu (nat
 
 ### Skills (`/` shortcuts)
 Type `/` in the chat for reusable shortcuts. Create your own in **Config → Skills**.
+
+### Working folder
+Click **📁** in the chat header to attach a folder to the current session. Commands then run inside it, so you can say *"list the files here"* or *"build this project"* without repeating the full path.
 
 ---
 
