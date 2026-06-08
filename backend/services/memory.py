@@ -40,6 +40,7 @@ class ChatSession(Base):
     __tablename__ = "sessions"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=True)
+    working_dir = Column(String, nullable=True)   # dossier de travail de la session
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
@@ -57,6 +58,20 @@ class Message(Base):
 
 
 Base.metadata.create_all(engine)
+
+
+def _migrate() -> None:
+    """Ajoute les colonnes manquantes aux bases existantes (SQLite simple)."""
+    try:
+        with engine.begin() as conn:
+            cols = {r[1] for r in conn.exec_driver_sql("PRAGMA table_info(sessions)").fetchall()}
+            if "working_dir" not in cols:
+                conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN working_dir VARCHAR")
+    except Exception:
+        pass
+
+
+_migrate()
 
 
 # ── Recherche plein-texte (SQLite FTS5) ────────────────────────────────────────
@@ -153,7 +168,22 @@ def _utc_iso(dt) -> str:
 def list_sessions() -> list[dict]:
     with Session(engine) as db:
         rows = db.query(ChatSession).order_by(ChatSession.updated_at.desc()).all()
-        return [{"id": s.id, "title": s.title, "updated_at": _utc_iso(s.updated_at)} for s in rows]
+        return [{"id": s.id, "title": s.title, "working_dir": s.working_dir,
+                 "updated_at": _utc_iso(s.updated_at)} for s in rows]
+
+
+def get_session_working_dir(session_id: str) -> str | None:
+    with Session(engine) as db:
+        s = db.query(ChatSession).filter_by(id=session_id).first()
+        return s.working_dir if s else None
+
+
+def set_session_working_dir(session_id: str, path: str | None) -> None:
+    with Session(engine) as db:
+        s = db.query(ChatSession).filter_by(id=session_id).first()
+        if s:
+            s.working_dir = (path or None)
+            db.commit()
 
 
 def get_session_messages(session_id: str) -> list[dict]:

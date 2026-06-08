@@ -1,9 +1,11 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+import os
+
 from services.memory import (
     create_session, list_sessions, get_session_messages, delete_session,
-    search_memory, search_history,
+    search_memory, search_history, set_session_working_dir, get_session_working_dir,
 )
 
 router = APIRouter()
@@ -11,6 +13,10 @@ router = APIRouter()
 
 class SessionCreate(BaseModel):
     title: str | None = None
+
+
+class WorkingDir(BaseModel):
+    path: str | None = None
 
 
 class SearchQuery(BaseModel):
@@ -38,6 +44,17 @@ def session_messages(session_id: str):
 def remove_session(session_id: str):
     delete_session(session_id)
     return {"status": "deleted"}
+
+
+@router.put("/sessions/{session_id}/working-dir")
+def set_working_dir(session_id: str, body: WorkingDir):
+    """Définit le dossier de travail d'une session (commandes + contexte)."""
+    path = (body.path or "").strip()
+    path = os.path.expanduser(path) if path else None
+    if path and not os.path.isdir(path):
+        return {"status": "error", "detail": "Dossier introuvable", "working_dir": get_session_working_dir(session_id)}
+    set_session_working_dir(session_id, path)
+    return {"status": "ok", "working_dir": path}
 
 
 @router.post("/search")

@@ -438,6 +438,7 @@ async def stream_pty(
     rows: int = 40,
     stdin_queue: asyncio.Queue | None = None,
     stop_event: asyncio.Event | None = None,
+    cwd: str | None = None,
 ):
     """
     Exécute cmd dans un PTY et yield des événements :
@@ -509,6 +510,7 @@ async def stream_pty(
         stderr=slave,
         env=env,
         start_new_session=True,
+        cwd=cwd if (cwd and os.path.isdir(cwd)) else None,  # dossier de travail de la session
     )
     os.close(slave)
 

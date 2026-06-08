@@ -80,6 +80,7 @@ export default function Home() {
   const [lastUserMsg, setLastUserMsg] = useState("");
   const [memoryRefresh, setMemoryRefresh] = useState(0);
   const [sessionTitle, setSessionTitle] = useState("");
+  const [workingDir, setWorkingDir] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const wsRef = useRef<WebSocket | null>(null);
@@ -446,9 +447,10 @@ export default function Home() {
     setMessages([]);
     // Titre de la session (affiché en haut de la discussion)
     fetch(`${API_BASE}/memory/sessions`).then(r => r.json()).then((list) => {
-      const s = Array.isArray(list) ? list.find((x: { id: string }) => x.id === id) : null;
+      const s = Array.isArray(list) ? list.find((x: { id: string; title?: string; working_dir?: string | null }) => x.id === id) : null;
       setSessionTitle(s?.title || "");
-    }).catch(() => setSessionTitle(""));
+      setWorkingDir(s?.working_dir || null);
+    }).catch(() => { setSessionTitle(""); setWorkingDir(null); });
     try {
       const res = await fetch(`${API_BASE}/memory/sessions/${id}/messages`);
       const data = await res.json();
@@ -458,6 +460,37 @@ export default function Home() {
           .map((m: { role: string; content: string }) => ({ role: m.role as "user" | "assistant", content: m.content })));
       }
     } catch { /* session vide ou backend indisponible */ }
+  };
+
+  // Dossier de travail de la session : les commandes s'exécutent dedans + indice de contexte.
+  const promptWorkingDir = async () => {
+    const next = window.prompt(t("workdirPrompt"), workingDir || "~/");
+    if (next === null) return;   // annulé
+    // Pas encore de session (écran d'accueil) → en créer une pour rattacher le dossier.
+    let sid = sessionId;
+    if (!sid) {
+      try {
+        const r = await fetch(`${API_BASE}/memory/sessions`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: null }),
+        });
+        sid = (await r.json()).id;
+        setSessionId(sid);
+      } catch { return; }
+    }
+    try {
+      const res = await fetch(`${API_BASE}/memory/sessions/${sid}/working-dir`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: next.trim() }),
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        setWorkingDir(data.working_dir || null);
+      } else {
+        window.alert(data.detail || t("workdirNotFound"));
+      }
+    } catch { /* backend indisponible */ }
   };
 
   const copyLastResponse = () => {
@@ -619,7 +652,7 @@ export default function Home() {
         <MemoryPanel
           activeSessionId={sessionId}
           onSelectSession={(id) => { loadSession(id); setPanel(null); }}
-          onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); setSessionTitle(""); }}
+          onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); setSessionTitle(""); setWorkingDir(null); }}
           refreshKey={memoryRefresh}
         />
       )}
@@ -652,8 +685,29 @@ export default function Home() {
             {models.map(m => <option key={m} value={m}>{modelLabel(m)}</option>)}
           </select>
 
+          {/* Dossier de travail de la session (commandes exécutées dedans) */}
+          <button onClick={promptWorkingDir}
+            title={workingDir ? `${t("workdirActive")} : ${workingDir}` : t("workdirSet")}
+            style={{
+              ...btnStyle(!!workingDir), padding: "3px 8px", fontSize: 11,
+              maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+            📁 {workingDir ? workingDir.replace(/^.*\//, "") || workingDir : t("workdir")}
+          </button>
+
+          {/* Titre de la session (auto-généré) dans l'espace libre de l'en-tête */}
+          {sessionTitle && (
+            <span style={{
+              flex: 1, minWidth: 0, textAlign: "center", padding: "0 12px",
+              fontSize: 12, fontWeight: 700, color: "var(--text)",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {sessionTitle}
+            </span>
+          )}
+
           {/* Contrôles principaux */}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ marginLeft: sessionTitle ? 0 : "auto", display: "flex", alignItems: "center", gap: 6 }}>
             <button onClick={() => setPanel(p => p === "config" ? null : "config")} title={t("navConfig")} style={btnStyle(panel === "config")}>
               ⚙ {t("navConfig")}
             </button>
@@ -753,17 +807,6 @@ export default function Home() {
                 Enregistrer
               </button>
             </div>
-          </div>
-        )}
-
-        {/* Titre de la session (auto-généré) en haut de la discussion */}
-        {sessionTitle && messages.length > 0 && (
-          <div style={{
-            flexShrink: 0, padding: "6px 20px", borderBottom: "1px solid var(--border)",
-            background: "var(--surface)", fontSize: 12, fontWeight: 700, color: "var(--text)",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          }}>
-            {sessionTitle}
           </div>
         )}
 

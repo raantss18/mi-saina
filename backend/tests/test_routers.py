@@ -96,6 +96,48 @@ def test_delete_session(client):
     assert all(s["id"] != sid for s in sessions)
 
 
+# ── /memory/sessions/{id}/working-dir ──────────────────────────────────────────
+
+def test_set_working_dir_valid(client, tmp_path):
+    sid = client.post("/memory/sessions", json={}).json()["id"]
+    resp = client.put(f"/memory/sessions/{sid}/working-dir", json={"path": str(tmp_path)})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert resp.json()["working_dir"] == str(tmp_path)
+    # Reflété dans la liste des sessions
+    sess = next(s for s in client.get("/memory/sessions").json() if s["id"] == sid)
+    assert sess["working_dir"] == str(tmp_path)
+
+
+def test_set_working_dir_missing_folder(client):
+    sid = client.post("/memory/sessions", json={}).json()["id"]
+    resp = client.put(f"/memory/sessions/{sid}/working-dir",
+                      json={"path": "/no/such/folder/xyz"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "error"
+
+
+def test_clear_working_dir(client, tmp_path):
+    sid = client.post("/memory/sessions", json={}).json()["id"]
+    client.put(f"/memory/sessions/{sid}/working-dir", json={"path": str(tmp_path)})
+    resp = client.put(f"/memory/sessions/{sid}/working-dir", json={"path": ""})
+    assert resp.status_code == 200
+    assert resp.json()["working_dir"] is None
+
+
+# ── chat: nettoyage du raisonnement avant stockage ─────────────────────────────
+
+def test_clean_for_store_strips_think():
+    from routers.chat import _clean_for_store
+    raw = "<think>réflexion interne longue</think>Voici la réponse finale."
+    assert _clean_for_store(raw) == "Voici la réponse finale."
+
+
+def test_clean_for_store_keeps_plain_text():
+    from routers.chat import _clean_for_store
+    assert _clean_for_store("Réponse simple") == "Réponse simple"
+
+
 # ── /config/system-prompt ─────────────────────────────────────────────────────
 
 def test_get_system_prompt_default(client):

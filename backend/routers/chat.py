@@ -10,8 +10,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from config import settings
 from services.llm import stream_response, select_model, complete
 from services.memory import (
-    add_message, get_session_messages, build_context_prefix, create_session,
-    update_session_title, session_message_count,
+    add_message, get_session_messages, create_session,
+    update_session_title, session_message_count, get_session_working_dir,
 )
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
@@ -26,6 +26,14 @@ SEARCH_RE = re.compile(r'\[SEARCH:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 REMEMBER_RE = re.compile(r'\[REMEMBER:\s*(.*?)\]', re.DOTALL)
 READ_RE = re.compile(r'\[READ:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
 RAG_RE = re.compile(r'\[RAG:\s*(.+?)\]', re.IGNORECASE | re.DOTALL)
+THINK_RE = re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE)
+
+
+def _clean_for_store(text: str) -> str:
+    """Retire le raisonnement <think>…</think> avant de stocker un message :
+    garde la mémoire et les embeddings propres (sinon le raisonnement d'une
+    ancienne tâche pollue le contexte des sessions suivantes)."""
+    return THINK_RE.sub("", text or "").strip()
 CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 SYSTEM_PROMPT_FILE = CONFIG_DIR / "system_prompt.txt"
 
@@ -141,7 +149,8 @@ async def _ws_reader(websocket: WebSocket, queue: asyncio.Queue):
 
 async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queue,
                           sudo_password: str | None = None,
-                          _started: bool = False) -> tuple[str, int, bool, dict]:
+                          _started: bool = False,
+                          cwd: str | None = None) -> tuple[str, int, bool, dict]:
     """Lance cmd en PTY, stream la sortie via WS, route stdin depuis ws_queue.
 
     Retourne (sortie_capturée, returncode, stoppé, outcome) pour permettre à la
@@ -203,7 +212,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
 
     try:
         async for event in stream_pty(cmd, sudo_password=sudo_password,
-                                      stdin_queue=stdin_q, stop_event=stop_event):
+                                      stdin_queue=stdin_q, stop_event=stop_event, cwd=cwd):
 
             if event["type"] == "needs_sudo":
                 # Demander le mot de passe au frontend.
@@ -238,7 +247,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                     # puis recréé par l'appel récursif).
                     routing_task.cancel()
                     return await _exec_streaming(cmd, websocket, ws_queue,
-                                                 p.get("password"), _started=True)
+                                                 p.get("password"), _started=True, cwd=cwd)
 
                 # Ni stop ni mot de passe → timeout.
                 await websocket.send_text(json.dumps({
@@ -282,7 +291,7 @@ async def _exec_streaming(cmd: str, websocket: WebSocket, ws_queue: asyncio.Queu
                 # Relancer l'ouverture sur le fichier choisi (chemin existant).
                 routing_task.cancel()
                 new_cmd = f"xdg-open {shlex.quote(chosen)}"
-                return await _exec_streaming(new_cmd, websocket, ws_queue, _started=True)
+                return await _exec_streaming(new_cmd, websocket, ws_queue, _started=True, cwd=cwd)
 
             elif event["type"] == "chunk":
                 captured.append(event["text"])
@@ -511,7 +520,8 @@ async def _run_search(query: str, websocket: WebSocket) -> tuple[str, str, int]:
 async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
                           persist: bool = True,
-                          approve_all: dict | None = None) -> tuple[bool, str, list[tuple[str, int]]]:
+                          approve_all: dict | None = None,
+                          cwd: str | None = None) -> tuple[bool, str, list[tuple[str, int]]]:
     """Boucle agentique sur `messages` (modèle → commandes → résultat → modèle).
 
     Retourne (stoppé, dernière_réponse, commandes_exécutées[(cmd, rc)]).
@@ -528,11 +538,11 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
         if stopped:
             await websocket.send_text(json.dumps({"type": "stopped"}))
             if persist and full_response:
-                await add_message(session_id, "assistant", full_response + " [arrêté]")
+                await add_message(session_id, "assistant", _clean_for_store(full_response) + " [arrêté]")
             break
 
         if persist:
-            await add_message(session_id, "assistant", full_response)
+            await add_message(session_id, "assistant", _clean_for_store(full_response))
         messages.append({"role": "assistant", "content": full_response})
 
         # Mémorisation durable d'une préférence/fait → profil utilisateur
@@ -567,7 +577,7 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                 results.append((cmd, "(commande refusée par l'utilisateur)", -1))
                 declined = True
                 continue
-            out, rc, was_stopped, outcome = await _exec_streaming(cmd, websocket, queue)
+            out, rc, was_stopped, outcome = await _exec_streaming(cmd, websocket, queue, cwd=cwd)
             results.append((cmd, out, rc))
             # Statut effectif : un échec logique (rc=0 mais sortie en erreur) compte
             # comme un échec pour l'apprentissage de compétences et le statut de tâche.
@@ -713,7 +723,16 @@ async def chat_ws(websocket: WebSocket):
                 session_id = payload["session_id"]
                 is_new_session = session_message_count(session_id) == 0
 
-            memory_context = await build_context_prefix(user_input)
+            # Isolation des sessions : on N'INJECTE PLUS d'extraits d'AUTRES sessions
+            # (ça « bavait » → le modèle répondait à une ancienne question). Le contexte
+            # = system prompt + profil/contexte global + historique de CETTE session.
+            memory_context = ""
+            # Dossier de travail de la session (commandes exécutées dedans + indice contexte).
+            session_cwd = get_session_working_dir(session_id)
+            if session_cwd:
+                memory_context = (f"## DOSSIER DE TRAVAIL DE CETTE SESSION : {session_cwd}\n"
+                                  "Les commandes shell s'exécutent depuis ce dossier. Utilise des "
+                                  "chemins relatifs à celui-ci par défaut pour cette session.")
             # Auto-RAG : si un corpus est indexé et que la question lui correspond
             # (similarité suffisante), on injecte les extraits pertinents directement
             # — fiable même si le petit modèle local n'émet pas [RAG: …] lui-même.
@@ -778,7 +797,7 @@ async def chat_ws(websocket: WebSocket):
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
                     stopped, last, ex = await _run_agent_loop(
                         sub_msgs, task_type, websocket, queue, session_id, persist=True,
-                        approve_all=approve_all)
+                        approve_all=approve_all, cwd=session_cwd)
                     executed += ex
                     if stopped:
                         break
@@ -793,7 +812,7 @@ async def chat_ws(websocket: WebSocket):
                 messages = _build_messages(history, subtasks[0], memory_context, attachments)
                 stopped, _, executed = await _run_agent_loop(
                     messages, task_type, websocket, queue, session_id, persist=True,
-                    approve_all=approve_all)
+                    approve_all=approve_all, cwd=session_cwd)
 
             # ── Auto-correction d'une compétence : la compétence a échoué puis été corrigée ──
             if (skill_name and not stopped and executed

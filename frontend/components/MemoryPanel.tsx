@@ -96,8 +96,8 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
       height: "100%",
       flexShrink: 0,
     }}>
-      <div style={{ padding: "12px 10px 8px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ padding: "12px 10px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/mi-saina-icon.png" alt="mi-saina" width={22} height={22} style={{ borderRadius: 5 }} />
           <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, letterSpacing: 0.2 }}>mi-saina</span>
@@ -106,17 +106,21 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
         <button
           onClick={handleNew}
           title={t("newSessionTip")}
+          onMouseEnter={e => { e.currentTarget.style.filter = "brightness(1.1)"; }}
+          onMouseLeave={e => { e.currentTarget.style.filter = "none"; }}
           style={{
-            width: "100%", padding: "6px", background: "var(--accent-dim, #20342a)",
-            border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: 4,
-            cursor: "pointer", fontSize: 12,
+            width: "100%", padding: "9px", background: "var(--accent)",
+            border: "none", color: "var(--accent-contrast)", borderRadius: 6,
+            cursor: "pointer", fontSize: 13, fontWeight: 700,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
           }}
         >
-          {t("newSession")}
+          <span style={{ fontSize: 15, lineHeight: 1 }}>+</span> {t("newSession")}
         </button>
       </div>
 
-      <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: 0.5, padding: "8px 12px 2px" }}>
+      <div style={{ fontSize: 10, color: "var(--text-muted)", letterSpacing: 0.8, fontWeight: 700, padding: "14px 12px 4px" }}>
         {t("historyLabel")}
       </div>
       <div style={{ flex: 1, overflowY: "auto", padding: "0 0 4px" }}>

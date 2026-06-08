@@ -7,13 +7,16 @@ interface Props {
   onPick: (text: string) => void;
 }
 
-const EXAMPLES: { icon: string; titleKey: Parameters<typeof t>[0]; promptKey: Parameters<typeof t>[0] }[] = [
-  { icon: "⬆", titleKey: "exUpdate", promptKey: "exUpdateP" },
-  { icon: "🌐", titleKey: "exWeb", promptKey: "exWebP" },
-  { icon: "📁", titleKey: "exDocs", promptKey: "exDocsP" },
-  { icon: "🩺", titleKey: "exDisk", promptKey: "exDiskP" },
-  { icon: "🔎", titleKey: "exFind", promptKey: "exFindP" },
-  { icon: "🧩", titleKey: "exPkg", promptKey: "exPkgP" },
+const EXAMPLES: {
+  icon: string; tint: string;
+  titleKey: Parameters<typeof t>[0]; descKey: Parameters<typeof t>[0]; promptKey: Parameters<typeof t>[0];
+}[] = [
+  { icon: "⬆", tint: "#3b82f6", titleKey: "exUpdate", descKey: "exUpdateD", promptKey: "exUpdateP" },
+  { icon: "🌐", tint: "#06b6d4", titleKey: "exWeb", descKey: "exWebD", promptKey: "exWebP" },
+  { icon: "📁", tint: "#eab308", titleKey: "exDocs", descKey: "exDocsD", promptKey: "exDocsP" },
+  { icon: "🩺", tint: "#ef4444", titleKey: "exDisk", descKey: "exDiskD", promptKey: "exDiskP" },
+  { icon: "🔎", tint: "#a855f7", titleKey: "exFind", descKey: "exFindD", promptKey: "exFindP" },
+  { icon: "🧩", tint: "#22c55e", titleKey: "exPkg", descKey: "exPkgD", promptKey: "exPkgP" },
 ];
 
 const SEEN_KEY = "ms-onboarded";
@@ -37,12 +40,12 @@ export default function WelcomeScreen({ onPick }: Props) {
       flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "center", padding: "24px", gap: 20, overflowY: "auto",
     }}>
-      <div style={{ textAlign: "center" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/mi-saina-icon.png" alt="mi-saina" width={72} height={72}
-          style={{ borderRadius: 18, marginBottom: 12, boxShadow: "var(--shadow)" }} />
-        <div style={{ fontSize: 34, fontWeight: 800, color: "var(--text)", letterSpacing: -0.5 }}>mi-saina</div>
-        <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 6 }}>
+        <img src="/mi-saina-icon.png" alt="mi-saina" width={80} height={80}
+          style={{ borderRadius: 20, marginBottom: 14, boxShadow: "var(--shadow)" }} />
+        <div style={{ fontSize: 36, fontWeight: 800, color: "var(--text)", letterSpacing: -0.5, lineHeight: 1.1 }}>mi-saina</div>
+        <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 8, maxWidth: 440 }}>
           {t("welcomeTagline")}
         </div>
       </div>
@@ -70,27 +73,54 @@ export default function WelcomeScreen({ onPick }: Props) {
         </div>
       )}
 
-      <div style={{
-        display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-        gap: 10, width: "100%", maxWidth: 720,
-      }}>
-        {EXAMPLES.map(ex => (
-          <button
-            key={ex.titleKey}
-            onClick={() => onPick(t(ex.promptKey))}
-            style={{
-              display: "flex", alignItems: "center", gap: 10, textAlign: "left",
-              background: "var(--surface)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius)", padding: "12px 14px", cursor: "pointer",
-              color: "var(--text)", fontSize: 13, transition: "border-color 0.15s, background 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--surface-2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; }}
-          >
-            <span style={{ fontSize: 20 }}>{ex.icon}</span>
-            <span>{t(ex.titleKey)}</span>
-          </button>
-        ))}
+      <div style={{ width: "100%", maxWidth: 760 }}>
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase",
+          color: "var(--text-muted)", textAlign: "center", marginBottom: 12,
+        }}>
+          {t("welcomeTry")}
+        </div>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 12,
+        }}>
+          {EXAMPLES.map(ex => (
+            <button
+              key={ex.titleKey}
+              onClick={() => onPick(t(ex.promptKey))}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, textAlign: "left",
+                background: "var(--surface)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: "14px 16px", cursor: "pointer", color: "var(--text)",
+                transition: "border-color 0.15s, background 0.15s, transform 0.15s, box-shadow 0.15s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = ex.tint;
+                e.currentTarget.style.background = "var(--surface-2)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "var(--shadow)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.background = "var(--surface)";
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              <span style={{
+                flexShrink: 0, width: 38, height: 38, borderRadius: 10,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19,
+                background: `${ex.tint}22`, border: `1px solid ${ex.tint}55`,
+              }}>{ex.icon}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 700 }}>{t(ex.titleKey)}</span>
+                <span style={{
+                  display: "block", fontSize: 11, color: "var(--text-muted)", marginTop: 2,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{t(ex.descKey)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
