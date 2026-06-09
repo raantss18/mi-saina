@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
@@ -13,7 +14,24 @@ from services.health_monitor import health_loop
 from services.config_map import config_map_loop
 from config import settings
 
-app = FastAPI(title="mi-saina API", version="1.0.14")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Démarrage : prépare les fichiers de mémoire et lance les boucles de fond
+    (planificateur, bilan santé, carte de config, profil machine). Remplace
+    `@app.on_event(\"startup\")`, déprécié dans les FastAPI récents."""
+    from services import userctx, machine_profile
+    userctx.ensure_files()   # crée context.md/profile.md vides si absents
+    if getattr(settings, "MACHINE_PROFILE", True):
+        asyncio.create_task(asyncio.to_thread(machine_profile.ensure_collected))
+    asyncio.create_task(scheduler_loop())
+    asyncio.create_task(health_loop())
+    asyncio.create_task(config_map_loop())
+    yield
+    # (rien à nettoyer : les tâches de fond meurent avec le process)
+
+
+app = FastAPI(title="mi-saina API", version="1.0.15", lifespan=lifespan)
 
 
 def _origin_allowed(origin: str | None) -> bool:
@@ -36,17 +54,6 @@ async def _origin_guard(request: Request, call_next):
         return JSONResponse({"detail": "origine non autorisée"}, status_code=403)
     return await call_next(request)
 
-
-@app.on_event("startup")
-async def _start_scheduler():
-    from services import userctx, machine_profile
-    userctx.ensure_files()   # crée context.md/profile.md vides si absents
-    # Profil machine : collecte au 1er démarrage (en fond, non bloquant).
-    if getattr(settings, "MACHINE_PROFILE", True):
-        asyncio.create_task(asyncio.to_thread(machine_profile.ensure_collected))
-    asyncio.create_task(scheduler_loop())
-    asyncio.create_task(health_loop())
-    asyncio.create_task(config_map_loop())
 
 app.add_middleware(
     CORSMiddleware,

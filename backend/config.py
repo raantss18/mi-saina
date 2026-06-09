@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # .env est à la racine du projet (un niveau au-dessus de backend/)
 _ENV_FILE = Path(__file__).parent.parent / ".env"
@@ -84,8 +84,9 @@ class Settings(BaseSettings):
     # détail consultable à la demande. Aucune valeur sensible lue. ~1×/jour.
     CONFIG_MAP: bool = True
 
-    class Config:
-        env_file = str(_ENV_FILE)
+    # Pydantic v2 : configuration via model_config (la classe imbriquée « Config »
+    # est dépréciée). `extra="ignore"` tolère d'anciennes clés .env inconnues.
+    model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
 
 
 settings = Settings()

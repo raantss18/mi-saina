@@ -17,6 +17,13 @@ DB_PATH.parent.mkdir(exist_ok=True)
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 
 
+def _utcnow() -> datetime:
+    """UTC naïf (sans tzinfo). Remplace `datetime.utcnow()` déprécié (Python 3.12+)
+    en gardant la MÊME sémantique de stockage : on stocke un datetime UTC naïf, que
+    `_utc_iso` marque ensuite explicitement UTC pour l'affichage côté navigateur."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 async def _get_embedding_async(text: str) -> list[float] | None:
     """Embedding via Ollama /api/embeddings — async, non-bloquant."""
     try:
@@ -41,8 +48,8 @@ class ChatSession(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     title = Column(String, nullable=True)
     working_dir = Column(String, nullable=True)   # dossier de travail de la session
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
 
 
@@ -53,7 +60,7 @@ class Message(Base):
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     embedding = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
     session = relationship("ChatSession", back_populates="messages")
 
 
@@ -226,7 +233,7 @@ async def add_message(session_id: str, role: str, content: str) -> None:
         db.add(Message(id=msg_id, session_id=session_id, role=role, content=content))
         s = db.query(ChatSession).filter_by(id=session_id).first()
         if s:
-            s.updated_at = datetime.utcnow()
+            s.updated_at = _utcnow()
         db.commit()
     # Fire-and-forget: ne bloque pas la réponse LLM
     asyncio.create_task(_update_embedding_bg(msg_id, content))

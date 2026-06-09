@@ -1,6 +1,6 @@
 [package]
 name = "mi-saina"
-version = "1.0.14"
+version = "1.0.15"
 description = "mi-saina — assistant IA local"
 authors = ["mi-saina"]
 edition = "2021"

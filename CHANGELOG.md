@@ -8,6 +8,16 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.15] - 2026-06-09
+
+### Corrigé — API Python dépréciées (compatibilité Python 3.14 / Pydantic 2 / FastAPI récents)
+- **`datetime.utcnow()`** (déprécié depuis Python 3.12) dans `services/memory.py` → remplacé par un helper `_utcnow()` (`datetime.now(timezone.utc)` ramené en UTC naïf) qui **préserve la sémantique de stockage** (UTC naïf, marqué UTC à l'affichage par `_utc_iso`). Supprime aussi l'avertissement « interne » de SQLAlchemy, qui appelait notre callable.
+- **Pydantic** : la classe imbriquée `class Config:` (dépréciée en v2) → `model_config = SettingsConfigDict(env_file=…, extra="ignore")` dans `config.py`.
+- **FastAPI** : `@app.on_event("startup")` (déprécié) → gestionnaire **`lifespan`** (`@asynccontextmanager`). Démarrage des boucles de fond (planificateur, bilan santé, carte de config, profil machine) inchangé, vérifié au boot.
+- **pytest** : `asyncio_default_fixture_loop_scope = function` ajouté à `pytest.ini` (retire l'avertissement de `pytest-asyncio`).
+
+> Aucun changement de comportement. Avertissements de dépréciation issus de **notre** code : **0** (il ne reste qu'un avertissement propre à FastAPI/Starlette en contexte de test, hors de notre code). 489 tests toujours verts.
+
 ## [1.0.14] - 2026-06-08
 
 ### Ajouté — carte de configuration (connaissance du setup)
