@@ -11,7 +11,10 @@ websockets>=11.0
 rich>=13.0.0
 sqlalchemy>=2.0.0
 aiosqlite>=0.19.0
-sentence-transformers>=2.2.0
+# [mi-saina-improve] sentence-transformers RETIRÉ : dépendance morte (jamais importée)
+# qui tirait torch (~750 Mo–2 Go) inutilement. Les embeddings passent par Ollama
+# (/api/embeddings, nomic-embed-text). Allège l'install et rend un AppImage autonome
+# réaliste. numpy reste requis (similarité cosinus en mémoire).
 numpy>=1.24.0
 
 # Lecture de documents (PDF/Word/Excel/PowerPoint) — pur-python, léger

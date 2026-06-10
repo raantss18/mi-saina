@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,10 +15,15 @@ const themeInit =
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr" className="h-full">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
-      </head>
-      <body className="h-full">{children}</body>
+      <body className="h-full">
+        {/* [mi-saina-improve] next/script (strategy beforeInteractive) au lieu d'une
+            balise <script> brute dans <head> : évite l'avertissement React
+            « script tag while rendering » (indicateur dev rouge sous WebKitGTK). */}
+        <Script id="ms-theme-init" strategy="beforeInteractive">
+          {themeInit}
+        </Script>
+        {children}
+      </body>
     </html>
   );
 }

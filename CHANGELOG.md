@@ -8,6 +8,14 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.1.1] - 2026-06-10
+
+### Corrigé
+- **Avertissement « script tag while rendering » / indicateur Next.js rouge en dev** : la balise `<script>` d'init du thème (anti-flash) dans `<head>` déclenchait un avertissement React (visible surtout sous WebKitGTK, le moteur de Tauri, en mode `dev`). Remplacée par `next/script` (`strategy="beforeInteractive"`). Sans impact sur la version desktop livrée (export statique). Le « Failed to fetch RSC payload » associé était lui aussi un artefact **dev-only** (pas de RSC en export statique).
+
+### Modifié — allègement (vers un bundle autonome)
+- **`sentence-transformers` retiré des dépendances** : dépendance **morte** (jamais importée — les embeddings passent par Ollama `/api/embeddings`) qui tirait **torch (~750 Mo–2 Go)** pour rien. L'installation est nettement plus légère et rapide, et un **AppImage autonome** devient réaliste. `numpy` reste requis.
+
 ## [1.1.0] - 2026-06-10
 
 > Jalon **1.1** — « efficacité agentique » : le thinking conditionnel est désormais
