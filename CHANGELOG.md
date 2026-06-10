@@ -8,6 +8,17 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.1.0] - 2026-06-10
+
+> Jalon **1.1** — « efficacité agentique » : le thinking conditionnel est désormais
+> complet, jusqu'au niveau de la sous-tâche.
+
+### Ajouté
+- **Thinking conditionnel PAR SOUS-TÂCHE** : lors de la décomposition d'une tâche complexe, chaque sous-tâche est **re-classée individuellement** (`task_classifier`) — une sous-tâche atomique (« Trouver le projet », « Compiler le projet », « Afficher l'espace disque ») tourne en **thinking OFF**, même si la tâche globale est COMPLEX, tandis que les sous-tâches analytiques (« Diagnostiquer chaque service », « plan de remédiation ») gardent le raisonnement. Gain de temps/tokens additionnel sur les plans multi-étapes. Décision seulement en mode `THINK=auto` (le choix explicite on/off est respecté). L'event WS `subtask_start` porte désormais `complexity` + `thinking`.
+
+### Détail
+- `routers/chat.py` : la boucle de sous-tâches calcule un `think_override` par étape via `task_classifier.classify(sub)` au lieu de propager celui de la tâche parente. +5 tests (520 au total).
+
 ## [1.0.16] - 2026-06-10
 
 ### Ajouté — thinking conditionnel & sanitisation d'entrée (audit P1–P5)

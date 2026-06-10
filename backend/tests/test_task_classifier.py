@@ -41,3 +41,25 @@ class TestClassify:
     def test_negated_symptom_not_counted_as_action(self):
         # « ne démarre pas » ne doit pas gonfler le compte de verbes → reste INTERMEDIATE
         assert tc.classify("nginx ne démarre pas, diagnostique") == tc.INTERMEDIATE
+
+
+class TestSubtaskGranularity:
+    """Sous-tâches atomiques d'un plan : doivent souvent retomber en SIMPLE (thinking off)
+    même si la tâche globale est COMPLEX — c'est le gain de la re-classification par étape."""
+
+    @pytest.mark.parametrize("sub", [
+        "Trouver le projet LaTeX dans ~/Documents",
+        "Compiler le projet",
+        "Afficher l'espace disque",
+    ])
+    def test_atomic_subtasks_are_simple(self, sub):
+        assert tc.classify(sub) == tc.SIMPLE
+        assert tc.wants_thinking(tc.classify(sub)) is False
+
+    @pytest.mark.parametrize("sub", [
+        "Diagnostiquer chaque service en échec",
+        "Proposer un plan de remédiation ordonné",
+    ])
+    def test_analytic_subtasks_keep_thinking(self, sub):
+        assert tc.classify(sub) == tc.COMPLEX
+        assert tc.wants_thinking(tc.classify(sub)) is True

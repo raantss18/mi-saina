@@ -845,10 +845,18 @@ async def chat_ws(websocket: WebSocket):
                 system_prompt = _load_system_prompt()
                 scratch = ""           # mémoire partagée minuscule entre sous-tâches
                 prev_cmds: list[str] = []   # commandes réussies (pour résoudre les référents)
+                # [mi-saina-improve] thinking conditionnel PAR SOUS-TÂCHE : une sous-tâche
+                # atomique (« lister X ») n'a pas besoin de raisonner, même si la tâche
+                # globale est COMPLEX. On ne décide qu'en mode THINK=auto (sinon réglage global).
+                auto_think = (settings.THINK or "auto").lower() == "auto"
                 for i, sub in enumerate(subtasks):
+                    sub_complexity = task_classifier.classify(sub)
+                    sub_think = task_classifier.wants_thinking(sub_complexity) if auto_think else None
                     await websocket.send_text(json.dumps({
                         "type": "subtask_start", "index": i + 1,
                         "total": len(subtasks), "text": sub,
+                        "complexity": sub_complexity,
+                        "thinking": (sub_think if sub_think is not None else (settings.THINK != "off")),
                     }))
                     # Contexte NEUF et minimal pour chaque sous-agent (peu de tokens)
                     sub_msgs = [{"role": "system", "content": system_prompt}]
@@ -863,7 +871,7 @@ async def chat_ws(websocket: WebSocket):
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
                     stopped, last, ex = await _run_agent_loop(
                         sub_msgs, task_type, websocket, queue, session_id, persist=True,
-                        approve_all=approve_all, cwd=session_cwd, think_override=think_override)
+                        approve_all=approve_all, cwd=session_cwd, think_override=sub_think)
                     executed += ex
                     if stopped:
                         break
