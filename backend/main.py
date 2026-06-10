@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     # (rien à nettoyer : les tâches de fond meurent avec le process)
 
 
-app = FastAPI(title="mi-saina API", version="1.0.15", lifespan=lifespan)
+app = FastAPI(title="mi-saina API", version="1.0.16", lifespan=lifespan)
 
 
 def _origin_allowed(origin: str | None) -> bool:

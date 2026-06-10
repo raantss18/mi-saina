@@ -97,6 +97,49 @@ Click **📁** in the chat header to attach a folder to the current session. Com
 
 ---
 
+## Prompt examples
+
+mi-saina classifies each request (**SIMPLE / INTERMEDIATE / COMPLEX**) to decide whether to *think*, decompose into sub-tasks, and how much context to pull. Simple questions answer fast with **thinking off**; complex ones are decomposed and run through a **ReAct loop** (act → observe real output → continue).
+
+### For Linux users (general public)
+
+| Prompt | What mi-saina does | Minimum GPU |
+|--------|--------------------|-------------|
+| *"Show disk usage and the biggest folders in my home"* | Runs `df -h` / `du` and summarizes the heaviest folders | Any GPU / CPU (4 GB) |
+| *"What's the command to list active systemd services?"* | Answers directly (thinking off, ~1–5 s) | Any GPU / CPU (4 GB) |
+| *"Update my system"* | Detects your package manager and runs the right upgrade, you confirm | Any GPU / CPU (4 GB) |
+| *"Find and open my invoice PDF"* | Locates the file by keyword and opens it | 6–8 GB (RTX 3060/4060) |
+| *"Summarize this PDF: …"* | Reads the document and gives the key points | 6–8 GB (RTX 3060/4060) |
+| *"Tidy my Downloads folder"* | Lists the real folder and proposes an organization plan | 6–8 GB (RTX 3060/4060) |
+| *"My nginx won't start after the update — diagnose and fix it"* | Inspects logs/units, proposes and (on confirm) applies a fix, verifies | 8 GB+ (RTX 4060+) |
+| *"Analyze my systemd logs from the last 24h, list every failed service and give a remediation plan for each"* | Decomposes into sub-tasks, diagnoses each service, builds an ordered plan | 8 GB+ (RTX 4060+) |
+
+### For developers / sysadmins
+
+What sets mi-saina apart from `shell-gpt`, Aider or Continue.dev: it **acts on the real system in a ReAct loop** and **knows your machine** (real paths, configured apps), all **100 % local**.
+
+**1. Visible ReAct loop with real output at each step**
+- Prompt: *"Why is my system slow right now? Investigate and fix what you can."*
+- Behind the scenes: classified COMPLEX → `[EXEC: ps aux --sort=-%mem | head]` → **real output injected** → reasons on it → `[EXEC: systemctl --failed]` → continues until it concludes. Destructive steps require confirmation.
+- Why a plain LLM fails: it would *guess* the cause from training data; mi-saina reasons on **your** actual process table and unit states.
+
+**2. RAG over live system context**
+- Prompt: *"What do my notes say about the VPN setup?"* (after indexing a folder in Config → Memory)
+- Behind the scenes: semantic search over your indexed docs (nomic-embed, SQLite) → top chunks (score ≥ 0.55) injected → answer cites the source files. No raw dump, budget-bounded.
+
+**3. Multi-service causal diagnosis**
+- Prompt: *"nginx, php-fpm and postgres are flaky after the upgrade — find the root cause."*
+- Behind the scenes: decomposed per service; each sub-agent runs with **fresh, minimal context** (fits 8 GB VRAM), shares only the concrete successful commands; cross-references unit states and logs.
+- Why a plain LLM fails: a single mega-prompt overruns the 9B and times out (measured > 170 s); decomposition makes each step tractable.
+
+**4. Bash script generation with built-in verification**
+- Prompt: *"Write a backup script for my ~/projects to an external drive, with a dry-run and a rollback note."*
+- Behind the scenes: generates the script via `[EXEC: cat > … <<'EOF'` , then **runs a dry-run** and shows the result before you commit — generate → verify, not generate-and-hope.
+
+> Tip: set the response style and reasoning in **Config → Settings** (`THINK = auto/on/off`). In `auto`, thinking is turned **off for simple queries** automatically.
+
+---
+
 ## ⚙️ Configuration
 
 In **Config**: system prompt, skills, **memory** (global context, profile, **document knowledge base / RAG**), and **settings** (confirmation mode, agent steps, context window, reasoning/`think`, **language**, automatic memory, software update, autostart…). Change the model anytime in **⬡ Models** (download from Ollama Hub, update, delete, or **import from LM Studio**).

@@ -16,6 +16,8 @@ from services.memory import (
 from services.shell_stream import stream_pty, is_destructive
 from services.planner import should_plan, plan_task, fit_budget, reference_hint
 from services import diagnostics, userctx, mcp_client, documents, rag, machine_profile, config_map
+# [mi-saina-improve] classifieur de complexité (thinking conditionnel) + sanitisation entrée
+from services import task_classifier, prompt_normalizer
 from services.sysinfo import system_block
 from services.web_search import search_web
 
@@ -466,13 +468,14 @@ def _format_exec_feedback(results: list[tuple[str, str, int]]) -> str:
 
 
 async def _stream_llm(messages: list, task_type: str, websocket: WebSocket,
-                      queue: asyncio.Queue) -> tuple[str, bool]:
-    """Stream la réponse du modèle vers le WS. Retourne (texte_complet, stoppé)."""
+                      queue: asyncio.Queue, think_override: bool | None = None) -> tuple[str, bool]:
+    """Stream la réponse du modèle vers le WS. Retourne (texte_complet, stoppé).
+    `think_override` : [mi-saina-improve] thinking conditionnel (None = réglage global)."""
     full_response = ""
     stopped = False
     # Garde-fou : tronquer le contexte pour ne pas saturer le modèle (petite VRAM)
     call_messages = fit_budget(messages)
-    async for token in stream_response(call_messages, task_type):
+    async for token in stream_response(call_messages, task_type, think=think_override):
         try:
             pending = queue.get_nowait()
             if pending is None:
@@ -558,18 +561,20 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
                           queue: asyncio.Queue, session_id: str,
                           persist: bool = True,
                           approve_all: dict | None = None,
-                          cwd: str | None = None) -> tuple[bool, str, list[tuple[str, int]]]:
+                          cwd: str | None = None,
+                          think_override: bool | None = None) -> tuple[bool, str, list[tuple[str, int]]]:
     """Boucle agentique sur `messages` (modèle → commandes → résultat → modèle).
 
     Retourne (stoppé, dernière_réponse, commandes_exécutées[(cmd, rc)]).
     `persist=False` pour un sous-agent à contexte éphémère.
     `approve_all` : conteneur partagé pour le « Tout valider » du tour.
+    `think_override` : [mi-saina-improve] thinking conditionnel (None = réglage global).
     """
     stopped = False
     last = ""
     executed: list[tuple[str, int]] = []
     for step in range(settings.MAX_AGENT_STEPS):
-        full_response, stopped = await _stream_llm(messages, task_type, websocket, queue)
+        full_response, stopped = await _stream_llm(messages, task_type, websocket, queue, think_override)
         last = full_response
 
         if stopped:
@@ -751,13 +756,29 @@ async def chat_ws(websocket: WebSocket):
             if msg_type in ("stop", "ping", "shell_stdin", "sudo_response", "exec_response", "open_choice_response"):
                 continue
 
-            user_input = payload.get("message", "")
+            # [mi-saina-improve] P5 : sanitisation de l'entrée AVANT tout traitement
+            # (normalise l'encodage, neutralise les marqueurs de directives collés,
+            # borne les entrées pathologiques). Les templates de chat restent gérés
+            # par Ollama (/api/chat) — on ne réécrit PAS im_start/[INST] à la main.
+            user_input = prompt_normalizer.sanitize(payload.get("message", ""))
             task_type = payload.get("task_type", "reason")
             attachments = payload.get("attachments")
             skill_name = payload.get("skill")   # compétence ayant déclenché ce message (si applicable)
 
             if not user_input.strip() and not attachments:
                 continue
+
+            # [mi-saina-improve] P4 : classification de complexité → thinking conditionnel.
+            # On n'override le thinking QUE si le réglage global est « auto » (sinon on
+            # respecte le choix explicite on/off de l'utilisateur).
+            complexity = task_classifier.classify(user_input)
+            think_override = None
+            if (settings.THINK or "auto").lower() == "auto":
+                think_override = task_classifier.wants_thinking(complexity)
+            await websocket.send_text(json.dumps({
+                "type": "meta", "complexity": complexity,
+                "thinking": (think_override if think_override is not None else (settings.THINK != "off")),
+            }))
 
             if not session_id:
                 session_id = payload.get("session_id") or create_session().id
@@ -842,7 +863,7 @@ async def chat_ws(websocket: WebSocket):
                                      "content": f"[SOUS-TÂCHE {i + 1}/{len(subtasks)}] {sub}"})
                     stopped, last, ex = await _run_agent_loop(
                         sub_msgs, task_type, websocket, queue, session_id, persist=True,
-                        approve_all=approve_all, cwd=session_cwd)
+                        approve_all=approve_all, cwd=session_cwd, think_override=think_override)
                     executed += ex
                     if stopped:
                         break
@@ -857,7 +878,7 @@ async def chat_ws(websocket: WebSocket):
                 messages = _build_messages(history, subtasks[0], memory_context, attachments)
                 stopped, _, executed = await _run_agent_loop(
                     messages, task_type, websocket, queue, session_id, persist=True,
-                    approve_all=approve_all, cwd=session_cwd)
+                    approve_all=approve_all, cwd=session_cwd, think_override=think_override)
 
             # ── Auto-correction d'une compétence : la compétence a échoué puis été corrigée ──
             if (skill_name and not stopped and executed

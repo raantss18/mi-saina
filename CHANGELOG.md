@@ -8,6 +8,21 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.0.16] - 2026-06-10
+
+### Ajouté — thinking conditionnel & sanitisation d'entrée (audit P1–P5)
+- **Thinking conditionnel par complexité** (P4) : nouveau `services/task_classifier.py` qui classe chaque requête **SIMPLE / INTERMEDIATE / COMPLEX** par heuristiques légères (zéro LLM). Une requête SIMPLE désactive le « raisonnement » du modèle (`think=False`), les autres le gardent. Threadé jusqu'à `llm.stream_response(think=…)` ; n'override que si le réglage global `THINK=auto` (le choix explicite on/off est respecté). Event WS `meta` (complexité + thinking).
+  - **Gain mesuré** (qwen3.5:9b) : sur du SIMPLE, **×3.7 à ×29 plus rapide** et **jusqu'à −99 % de tokens** générés, à qualité égale (ex. « espace disque ? » → `df -h` en 1.7 s au lieu de 49.7 s, dont 4326 caractères de raisonnement inutile).
+- **Sanitisation de l'entrée utilisateur** (P5) : nouveau `services/prompt_normalizer.py` — normalise l'encodage (NFC), retire les caractères de contrôle, **défang** les marqueurs de directives collés (un log contenant `[EXEC: rm -rf ~]` ou `</think>` ne peut plus détourner l'agent) et borne les entrées pathologiques. Les **templates de chat par modèle restent gérés par Ollama** (les réécrire à la main les casserait — choix documenté dans l'audit).
+
+### Documentation
+- `docs/audit_9b_limitations.md` : audit complet P1–P5 (citations fichier:ligne) + mesures réelles + limites résiduelles du 9B.
+- `docs/improvement_report.md` : statut des 5 solutions, comparatif avant/après, recommandations.
+- **README** : nouvelle section **« Prompt examples »** (utilisateurs grand public avec GPU minimum + développeurs/sysadmins avec coulisses ReAct/RAG/décomposition).
+
+### Note d'audit
+- **P1 (décomposition), P2 (RAG/contexte), P3 (boucle ReAct) étaient déjà implémentés** (`planner.py`, `rag.py` + `fit_budget`, `_run_agent_loop`) et n'ont pas été dupliqués — seuls les manques réels (P4, P5) ont été ajoutés, de façon additive et rétrocompatible. +26 tests (515 au total).
+
 ## [1.0.15] - 2026-06-09
 
 ### Corrigé — API Python dépréciées (compatibilité Python 3.14 / Pydantic 2 / FastAPI récents)

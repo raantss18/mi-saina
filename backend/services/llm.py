@@ -85,11 +85,17 @@ class ThinkStripper:
         return rest
 
 
-async def stream_response(messages: list, task_type: str = "reason"):
+async def stream_response(messages: list, task_type: str = "reason",
+                          think: bool | None = None):
+    # [mi-saina-improve] `think` per-requête : permet le THINKING CONDITIONNEL piloté
+    # par task_classifier (SIMPLE → off). None = comportement historique (réglage THINK).
     model = select_model(task_type)
     client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
     kwargs = dict(model=model, messages=messages, stream=True, options=_options())
-    kwargs.update(_think_kwargs())
+    if think is None:
+        kwargs.update(_think_kwargs())          # mode auto/on/off global (inchangé)
+    else:
+        kwargs["think"] = think                 # décision par complexité de la requête
     try:
         gen = await client.chat(**kwargs)
     except TypeError:
