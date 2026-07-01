@@ -24,6 +24,7 @@ interface Props {
   onShellInput?: (text: string) => void;
   onRegenerate?: (index: number) => void;
   onDelete?: (index: number) => void;
+  onEdit?: (index: number, newText: string) => void;
 }
 
 // Sépare le raisonnement <think>…</think> de la réponse (rendu en menu déroulant).
@@ -41,9 +42,10 @@ function splitThinking(text: string): { thinking: string; answer: string; thinki
   };
 }
 
-// Boutons d'action sous un message (copier / régénérer / supprimer).
-function MsgActions({ onCopy, onRegen, onDelete, align }: {
-  onCopy: () => void; onRegen?: () => void; onDelete?: () => void; align: "flex-start" | "flex-end";
+// Boutons d'action sous un message (copier / éditer / régénérer / supprimer).
+function MsgActions({ onCopy, onRegen, onDelete, onEdit, align }: {
+  onCopy: () => void; onRegen?: () => void; onDelete?: () => void; onEdit?: () => void;
+  align: "flex-start" | "flex-end";
 }) {
   const [copied, setCopied] = useState(false);
   const btn: React.CSSProperties = {
@@ -55,8 +57,48 @@ function MsgActions({ onCopy, onRegen, onDelete, align }: {
       <button style={btn} title={t("msgCopy")} onClick={() => { onCopy(); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>
         {copied ? "✓" : "⎘"}
       </button>
+      {onEdit && <button style={btn} title={t("msgEdit")} onClick={onEdit}>✎</button>}
       {onRegen && <button style={btn} title={t("msgRegen")} onClick={onRegen}>↺</button>}
       {onDelete && <button style={btn} title={t("msgDelete")} onClick={onDelete}>🗑</button>}
+    </div>
+  );
+}
+
+// Édition inline d'un message utilisateur (branche la conversation à partir d'ici).
+function EditBox({ initial, onSave, onCancel }: {
+  initial: string; onSave: (text: string) => void; onCancel: () => void;
+}) {
+  const [val, setVal] = useState(initial);
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { const el = ref.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, []);
+  const save = () => { const v = val.trim(); if (v) onSave(v); };
+  return (
+    <div style={{ maxWidth: "80%", width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
+      <textarea
+        ref={ref}
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
+          if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+        }}
+        rows={Math.min(8, Math.max(2, val.split("\n").length))}
+        style={{
+          width: "100%", resize: "vertical", background: "var(--surface)",
+          color: "var(--text)", border: "1px solid var(--accent)", borderRadius: 10,
+          padding: "8px 10px", fontSize: 13, lineHeight: 1.5, fontFamily: "inherit", outline: "none",
+        }}
+      />
+      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+        <button onClick={onCancel} style={{
+          background: "var(--border)", border: "none", color: "var(--text-muted)",
+          padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11,
+        }}>{t("editCancel")}</button>
+        <button onClick={save} style={{
+          background: "var(--accent-grad, var(--accent))", border: "none", color: "var(--accent-contrast)",
+          padding: "4px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700,
+        }}>{t("editSave")}</button>
+      </div>
     </div>
   );
 }
@@ -182,8 +224,9 @@ function ShellStreamBlock({
   );
 }
 
-export default function ChatWindow({ messages, onShellInput, onRegenerate, onDelete }: Props) {
+export default function ChatWindow({ messages, onShellInput, onRegenerate, onDelete, onEdit }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [editing, setEditing] = useState<number | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -222,6 +265,19 @@ export default function ChatWindow({ messages, onShellInput, onRegenerate, onDel
               fontFamily: "var(--font-mono, monospace)",
             }}>
               {msg.content}
+            </div>
+          );
+        }
+
+        // Édition inline d'un message utilisateur (fork de la conversation).
+        if (editing === i && msg.role === "user" && onEdit) {
+          return (
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+              <EditBox
+                initial={msg.content}
+                onCancel={() => setEditing(null)}
+                onSave={(text) => { setEditing(null); onEdit(i, text); }}
+              />
             </div>
           );
         }
@@ -268,11 +324,12 @@ export default function ChatWindow({ messages, onShellInput, onRegenerate, onDel
             {msg.model && (
               <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3, padding: "0 4px" }}>{msg.model}</div>
             )}
-            {/* Actions sous le message (copier / régénérer / supprimer) */}
+            {/* Actions sous le message (copier / éditer / régénérer / supprimer) */}
             {!msg.streaming && (
               <MsgActions
                 align={msg.role === "user" ? "flex-end" : "flex-start"}
                 onCopy={() => navigator.clipboard.writeText(splitThinking(msg.content).answer || msg.content)}
+                onEdit={msg.role === "user" && onEdit ? () => setEditing(i) : undefined}
                 onRegen={msg.role === "assistant" && onRegenerate ? () => onRegenerate(i) : undefined}
                 onDelete={onDelete ? () => onDelete(i) : undefined}
               />

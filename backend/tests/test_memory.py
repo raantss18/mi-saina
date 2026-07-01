@@ -168,6 +168,70 @@ class TestAddMessage:
         assert session_message_count(s.id) == 2
 
 
+# ── truncate / delete (édition / régénération) ────────────────────────────────
+
+class TestTruncateSession:
+    @pytest.mark.asyncio
+    async def test_truncate_keeps_prefix(self, mem_engine, mock_embedding):
+        from services.memory import truncate_session
+        s = create_session()
+        for i in range(4):
+            await add_message(s.id, "user" if i % 2 == 0 else "assistant", f"m{i}")
+        removed = truncate_session(s.id, keep=2)
+        assert removed == 2
+        msgs = get_session_messages(s.id)
+        assert [m["content"] for m in msgs] == ["m0", "m1"]
+
+    @pytest.mark.asyncio
+    async def test_truncate_zero_clears_all(self, mem_engine, mock_embedding):
+        from services.memory import truncate_session
+        s = create_session()
+        await add_message(s.id, "user", "a")
+        assert truncate_session(s.id, keep=0) == 1
+        assert get_session_messages(s.id) == []
+
+    @pytest.mark.asyncio
+    async def test_truncate_keep_beyond_length_is_noop(self, mem_engine, mock_embedding):
+        from services.memory import truncate_session
+        s = create_session()
+        await add_message(s.id, "user", "a")
+        assert truncate_session(s.id, keep=10) == 0
+        assert len(get_session_messages(s.id)) == 1
+
+    @pytest.mark.asyncio
+    async def test_regenerate_does_not_duplicate_history(self, mem_engine, mock_embedding):
+        """Régénérer = tronquer la réponse puis renvoyer le message user. Sans la
+        troncature, l'historique doublait (bug corrigé)."""
+        from services.memory import truncate_session
+        s = create_session()
+        await add_message(s.id, "user", "question")
+        await add_message(s.id, "assistant", "réponse v1")
+        # Régénération : on garde le seul message user, on ré-empile la question.
+        truncate_session(s.id, keep=1)
+        await add_message(s.id, "assistant", "réponse v2")
+        contents = [m["content"] for m in get_session_messages(s.id)]
+        assert contents == ["question", "réponse v2"]
+
+
+class TestDeleteMessageAt:
+    @pytest.mark.asyncio
+    async def test_delete_middle_message(self, mem_engine, mock_embedding):
+        from services.memory import delete_message_at
+        s = create_session()
+        for i in range(3):
+            await add_message(s.id, "user", f"m{i}")
+        assert delete_message_at(s.id, 1) is True
+        assert [m["content"] for m in get_session_messages(s.id)] == ["m0", "m2"]
+
+    @pytest.mark.asyncio
+    async def test_delete_out_of_range(self, mem_engine, mock_embedding):
+        from services.memory import delete_message_at
+        s = create_session()
+        await add_message(s.id, "user", "only")
+        assert delete_message_at(s.id, 5) is False
+        assert len(get_session_messages(s.id)) == 1
+
+
 # ── search_memory (async, mocked embeddings) ──────────────────────────────────
 
 class TestSearchMemory:

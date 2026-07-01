@@ -284,7 +284,10 @@ const T: Dict = {
   msgCopy: { en: "Copy", fr: "Copier", mg: "Adikao" },
   msgRegen: { en: "Regenerate", fr: "Régénérer", mg: "Avereno" },
   msgDelete: { en: "Delete", fr: "Supprimer", mg: "Fafao" },
+  msgEdit: { en: "Edit & resend", fr: "Éditer et renvoyer", mg: "Ovay & alefaso" },
   msgCopied: { en: "Copied", fr: "Copié", mg: "Voadika" },
+  editSave: { en: "Save & resend", fr: "Enregistrer et renvoyer", mg: "Tehirizo & alefaso" },
+  editCancel: { en: "Cancel", fr: "Annuler", mg: "Foano" },
 
   // MemoryPanel — recherche unifiée
   searchPlaceholder: { en: "Search your history (keywords or meaning)…", fr: "Rechercher dans l'historique (mots-clés ou sens)…", mg: "Hikaroka ao amin'ny tantara (teny na hevitra)…" },

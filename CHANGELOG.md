@@ -8,6 +8,25 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.2.0] - 2026-07-01
+
+> Jalon **1.2** — « chat plus vivant » : rendu du code coloré, actions par message
+> (éditer/brancher/régénérer), et rafraîchissement visuel — le tout **sans alourdir**
+> (zéro nouvelle dépendance ; le highlighter est écrit maison).
+
+### Ajouté
+- **Coloration syntaxique des blocs de code + bouton copier** — nouveau `lib/highlight.ts`, un tokenizer **sans dépendance** (dans l'esprit du retrait de torch en 1.1.1) couvrant shell, Python, JS/TS et JSON, avec repli générique (chaînes/nombres/commentaires). Chaque bloc affiche son langage et un bouton « copier ». Tout est échappé → aucune injection HTML. Composant `CodeBlock`, intégré au rendu Markdown. +11 tests frontend.
+- **Éditer / brancher / régénérer un message** — sous chaque message : ✎ éditer un message utilisateur puis renvoyer (branche la conversation à partir de ce point), ↺ régénérer une réponse, 🗑 supprimer. Ces actions **synchronisent la base** (voir ci-dessous) au lieu de ne modifier que l'affichage.
+
+### Modifié
+- **Thème « soft premium »** — palette raffinée (fonds plus profonds, surfaces feutrées, ombres douces en deux couches, rayons plus généreux), dégradé d'accent subtil pour les actions primaires, sélection de texte teintée. La **teinte d'accent verte est préservée** pour rester cohérent avec les styles existants. Uniquement des variables CSS — aucun composant réécrit, aucune dépendance.
+
+### Corrigé
+- **Régénérer dupliquait l'historique en base** — la régénération/suppression ne modifiait que le fil affiché ; la base (SQLite) conservait les anciens messages, si bien que le modèle recevait un contexte incohérent au tour suivant. Nouveaux endpoints `POST /memory/sessions/{id}/truncate` et `DELETE /memory/sessions/{id}/messages/{index}` ; le frontend mappe l'index du fil (qui inclut les pseudo-messages shell/plan) vers l'index en base. + tests.
+
+### Détail
+- 551 tests backend, 81 tests frontend, build Next.js OK. Aucune dépendance ajoutée (frontend comme backend).
+
 ## [1.1.2] - 2026-07-01
 
 > Revue **sécurité & fiabilité** complète du backend : deux failles locales réelles

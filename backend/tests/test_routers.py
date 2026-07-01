@@ -96,6 +96,34 @@ def test_delete_session(client):
     assert all(s["id"] != sid for s in sessions)
 
 
+def _seed_messages(sid, n):
+    """Insère n messages en base via le service (l'API n'expose pas d'ajout)."""
+    import asyncio
+    from services.memory import add_message
+    for i in range(n):
+        asyncio.run(add_message(sid, "user" if i % 2 == 0 else "assistant", f"m{i}"))
+
+
+def test_truncate_endpoint(client):
+    sid = client.post("/memory/sessions", json={}).json()["id"]
+    _seed_messages(sid, 4)
+    r = client.post(f"/memory/sessions/{sid}/truncate", json={"keep": 2})
+    assert r.status_code == 200 and r.json()["removed"] == 2
+    msgs = client.get(f"/memory/sessions/{sid}/messages").json()
+    assert [m["content"] for m in msgs] == ["m0", "m1"]
+
+
+def test_delete_message_endpoint(client):
+    sid = client.post("/memory/sessions", json={}).json()["id"]
+    _seed_messages(sid, 3)
+    r = client.delete(f"/memory/sessions/{sid}/messages/1")
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+    msgs = client.get(f"/memory/sessions/{sid}/messages").json()
+    assert [m["content"] for m in msgs] == ["m0", "m2"]
+    # Index hors bornes → not_found
+    assert client.delete(f"/memory/sessions/{sid}/messages/9").json()["status"] == "not_found"
+
+
 # ── /memory/sessions/{id}/working-dir ──────────────────────────────────────────
 
 def test_set_working_dir_valid(client, tmp_path):
