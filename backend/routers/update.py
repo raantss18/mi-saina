@@ -6,6 +6,7 @@ Deux modes auto-détectés :
                release GitHub et relance de l'installeur (pkexec).
 """
 import asyncio
+import hashlib
 import json
 import os
 import re
@@ -155,6 +156,29 @@ async def _update_source():
         yield _ev({"log": "✅ Mise à jour appliquée. Recompile/relance la fenêtre desktop pour terminer (npm run desktop:build)."})
 
 
+_SHA256_RE = re.compile(r"\b[0-9a-f]{64}\b", re.IGNORECASE)
+
+
+async def _expected_sha256(rel: dict, asset_name: str, client: httpx.AsyncClient) -> str | None:
+    """Somme SHA-256 publiée avec la release (asset `<nom>.sha256` ou SHA256SUMS).
+    None si la release n'en fournit pas (on reste rétro-compatible)."""
+    candidates = {asset_name + ".sha256", asset_name + ".sha256sum", "SHA256SUMS", "SHA256SUMS.txt"}
+    sha_asset = next((a for a in rel.get("assets", []) if a["name"] in candidates), None)
+    if not sha_asset:
+        return None
+    try:
+        r = await client.get(sha_asset["browser_download_url"])
+        for line in r.text.splitlines():
+            if sha_asset["name"].startswith("SHA256SUMS") and asset_name not in line:
+                continue
+            m = _SHA256_RE.search(line)
+            if m:
+                return m.group(0).lower()
+    except Exception:
+        pass
+    return None
+
+
 async def _update_run():
     rel = await _latest_release()
     if not rel:
@@ -171,10 +195,21 @@ async def _update_run():
     yield _ev({"log": f"📥 Téléchargement de {safe_name}…"})
     try:
         async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:
+            h = hashlib.sha256()
             async with client.stream("GET", asset["browser_download_url"]) as resp:
                 with open(dest, "wb") as f:
                     async for chunk in resp.aiter_bytes(1 << 16):
+                        h.update(chunk)
                         f.write(chunk)
+            # Intégrité : si la release publie une somme SHA-256, l'installeur
+            # (lancé en ROOT via pkexec) doit y correspondre exactement.
+            expected = await _expected_sha256(rel, asset["name"], client)
+            if expected:
+                if h.hexdigest().lower() != expected:
+                    yield _ev({"log": "✗ Somme SHA-256 invalide — installeur corrompu ou altéré, abandon."})
+                    dest.unlink(missing_ok=True)
+                    return
+                yield _ev({"log": "🔒 Intégrité vérifiée (SHA-256)."})
         os.chmod(dest, 0o755)
     except Exception as e:  # noqa: BLE001
         yield _ev({"log": f"✗ Téléchargement échoué : {e}"})

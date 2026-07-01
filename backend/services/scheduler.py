@@ -94,7 +94,7 @@ def _is_due(job: dict, now: datetime) -> bool:
 async def _run_safe_command(cmd: str) -> tuple[str, int]:
     out = []
     rc = -1
-    async for ev in stream_pty(cmd, timeout=300):
+    async for ev in stream_pty(cmd, idle_timeout=300):
         if ev["type"] == "chunk":
             out.append(ev["text"])
         elif ev["type"] == "done":

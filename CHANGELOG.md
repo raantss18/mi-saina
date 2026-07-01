@@ -8,6 +8,27 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [1.1.2] - 2026-07-01
+
+> Revue **sécurité & fiabilité** complète du backend : deux failles locales réelles
+> corrigées, un bug qui cassait toutes les tâches planifiées, et des durcissements.
+
+### Sécurité
+- **Mot de passe sudo plus jamais sur une ligne de commande** : le chemin non-streamé (`services/shell_exec.py`) l'interpolait dans `echo <mdp> | sudo -S …` → il était **lisible par n'importe quel processus local** via `/proc/<pid>/cmdline` pendant l'exécution. Il passe désormais par **stdin** (`sudo -S`), comme le chemin PTY. Tests de non-régression (le mot de passe ne doit jamais apparaître dans la commande lancée).
+- **Garde anti-DNS-rebinding (validation du header Host)** : la vérification d'origine seule ne suffisait pas — une page distante pouvait faire pointer son domaine sur `127.0.0.1` puis requêter « son » origine **sans header Origin** (GET no-cors, `EventSource`, navigation) et atteindre par ex. `/update/apply` (lance l'installeur !) ou `/rag/index`. Le Host doit désormais être local (`localhost`/`127.0.0.1`/`::1`/`*.localhost`) sur **toutes** les routes HTTP **et** le WebSocket du chat. Même défense que Jupyter/Ollama. Réglage `EXTRA_ALLOWED_HOSTS` (.env) pour les setups avancés. Nouveau module `backend/security.py` = source unique des deux gardes (l'`_origin_allowed` dupliqué de `main.py`/`chat.py` y est consolidé).
+- **Timeout de `/shell/execute` : le processus est tué** (groupe entier, `SIGKILL`) — avant, la commande **continuait de tourner en arrière-plan** après le message « Timeout ». stdin passe aussi à `DEVNULL` (une commande interactive reçoit EOF au lieu de bloquer).
+- **Mise à jour `.run` : vérification d'intégrité SHA-256** de l'installeur téléchargé (lancé en root via pkexec) quand la release publie une somme (`<nom>.sha256` ou `SHA256SUMS`) ; abandon si mismatch. Rétro-compatible si absente.
+- **Compétences : nom invalide rejeté (400)** — un nom vidé par la sanitisation créait/supprimait un fichier caché « `.json` ».
+
+### Corrigé
+- **Tâches planifiées toutes cassées** : `scheduler._run_safe_command` appelait `stream_pty(cmd, timeout=300)` alors que le paramètre s'appelle `idle_timeout` → `TypeError` avalé par la boucle de fond, **aucune tâche planifiée ne s'exécutait**. + tests (`tests/test_scheduler.py`, nouveau).
+- **`needs_root` ne connaissait que pacman/Arch** alors que le README annonce toutes les grandes distros : sur Debian/Fedora/openSUSE/Void/Alpine, `apt|dnf|zypper|xbps|apk install/upgrade/remove…` partait **sans demande de mot de passe sudo** et échouait en `Permission denied`. Les opérations d'écriture de ces gestionnaires déclenchent maintenant le dialogue sudo (les sous-commandes read-only — search, list, info — non).
+- **WebSocket chat : un message JSON malformé tuait la session** (exception hors boucle) → il est ignoré proprement. `prompt_normalizer.sanitize` tolère aussi un `message` non-string.
+- **RAG : les dossiers cachés et artefacts de build ne sont plus indexés** (`.git`, `node_modules`, `__pycache__`, `venv`, `dist`…) — ils évinçaient les vrais documents (plafond `max_files`) et polluaient les réponses.
+
+### Détail
+- 543 tests backend (520 avant), 70 tests frontend, build Next.js OK.
+
 ## [1.1.1] - 2026-06-10
 
 ### Corrigé

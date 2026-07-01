@@ -7,6 +7,7 @@ import json
 import httpx
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+import security
 from config import settings
 from services.llm import stream_response, select_model, complete
 from services.memory import (
@@ -716,25 +717,19 @@ async def _run_agent_loop(messages: list, task_type: str, websocket: WebSocket,
     return stopped, last, executed
 
 
-def _origin_allowed(origin: str | None) -> bool:
-    """Garde anti-CSWSH : un site web malveillant ouvert dans un navigateur local
-    pourrait sinon se connecter à ce WebSocket (qui exécute des commandes shell).
-    On n'autorise que les origines locales (web dev) et l'appli desktop (tauri)."""
-    if not origin:
-        return True  # clients natifs/CLI locaux (pas d'origine de navigateur)
-    try:
-        from urllib.parse import urlparse
-        host = (urlparse(origin).hostname or "").lower()
-    except Exception:
-        return False
-    if origin.startswith("tauri://"):
-        return True
-    return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
+# Gardes réseau locales (source unique : security.py) — compat tests existants.
+_origin_allowed = security.origin_allowed
 
 
 @router.websocket("/ws")
 async def chat_ws(websocket: WebSocket):
-    if not _origin_allowed(websocket.headers.get("origin")):
+    # Garde anti-DNS-rebinding (Host local) + anti-CSWSH (origine locale) : ce
+    # WebSocket exécute des commandes shell, il ne doit être joignable que
+    # depuis la machine (même défense que le middleware HTTP de main.py).
+    if not security.host_allowed(websocket.headers.get("host")):
+        await websocket.close(code=1008)  # Policy Violation
+        return
+    if not security.origin_allowed(websocket.headers.get("origin")):
         await websocket.close(code=1008)  # Policy Violation
         return
     await websocket.accept()
@@ -749,7 +744,12 @@ async def chat_ws(websocket: WebSocket):
             if raw is None:
                 break
 
-            payload = json.loads(raw)
+            try:
+                payload = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue   # message malformé → ignoré (ne tue pas la session)
+            if not isinstance(payload, dict):
+                continue
             msg_type = payload.get("type", "chat")
 
             # Messages de contrôle hors contexte

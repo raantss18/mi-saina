@@ -38,7 +38,7 @@ MAX_INPUT_CHARS = 8000
 
 def sanitize(text: str, max_chars: int = MAX_INPUT_CHARS) -> str:
     """Normalise + défang + borne l'entrée utilisateur. Jamais d'exception."""
-    if not text:
+    if not text or not isinstance(text, str):
         return ""
     try:
         t = unicodedata.normalize("NFC", text)

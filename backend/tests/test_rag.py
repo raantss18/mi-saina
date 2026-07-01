@@ -56,6 +56,22 @@ async def test_index_and_search(temp_rag, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_index_skips_hidden_and_build_dirs(temp_rag, tmp_path):
+    """`.git`, `node_modules`… ne doivent pas polluer la base documentaire."""
+    docs = tmp_path / "docs"
+    (docs / ".git").mkdir(parents=True)
+    (docs / "node_modules" / "pkg").mkdir(parents=True)
+    (docs / ".git" / "config.txt").write_text("interne git")
+    (docs / "node_modules" / "pkg" / "readme.md").write_text("dépendance")
+    (docs / ".cache.txt").write_text("fichier caché")
+    (docs / "notes.txt").write_text("mes vraies notes python")
+
+    async for _ in temp_rag.index_folder(str(docs)):
+        pass
+    assert temp_rag.status() == {"chunks": 1, "files": 1}
+
+
+@pytest.mark.asyncio
 async def test_index_missing_folder(temp_rag, tmp_path):
     events = [ev async for ev in temp_rag.index_folder(str(tmp_path / "nope"))]
     assert any("error" in ev for ev in events)

@@ -82,15 +82,67 @@ class TestExecuteCommandSafe:
 class TestExecuteCommandTimeout:
     @pytest.mark.asyncio
     async def test_timeout_returns_timeout_status(self, monkeypatch):
+        from config import settings
+
+        monkeypatch.setattr(settings, "SHELL_TIMEOUT", 1)
+        result = await execute_command("sleep 30")
+        assert result["status"] == "timeout"
+        assert "Timeout" in result["output"]
+
+    @pytest.mark.asyncio
+    async def test_timeout_kills_the_process(self, monkeypatch, tmp_path):
+        """Au timeout, la commande doit être TUÉE (avant : elle continuait en fond)."""
         import asyncio
         from config import settings
 
-        monkeypatch.setattr(settings, "SHELL_TIMEOUT", 0)
+        monkeypatch.setattr(settings, "SHELL_TIMEOUT", 1)
+        marker = tmp_path / "leaked"
+        await execute_command(f"sleep 2 && touch {marker}")
+        await asyncio.sleep(1.7)   # laisserait le temps au processus orphelin de finir
+        assert not marker.exists(), "le processus a survécu au timeout"
 
-        async def instant_timeout(coro, timeout=None):
-            raise asyncio.TimeoutError()
 
-        monkeypatch.setattr(asyncio, "wait_for", instant_timeout)
-        result = await execute_command("echo test")
-        assert result["status"] == "timeout"
-        assert "Timeout" in result["output"]
+class TestSudoPasswordNotOnCmdline:
+    @pytest.mark.asyncio
+    async def test_password_never_in_command_line(self, monkeypatch):
+        """Le mot de passe sudo ne doit JAMAIS être interpolé dans la commande
+        lancée (elle serait visible par tout processus local via /proc/*/cmdline).
+        Il doit passer par stdin (`sudo -S`)."""
+        import asyncio
+        import services.shell_exec as se
+
+        seen: dict = {}
+        real = asyncio.create_subprocess_shell
+
+        async def spy(cmd, **kwargs):
+            seen["cmd"] = cmd
+            seen["stdin"] = kwargs.get("stdin")
+            kwargs["stdin"] = asyncio.subprocess.PIPE
+            return await real("cat >/dev/null; true", **kwargs)
+
+        monkeypatch.setattr(se.asyncio, "create_subprocess_shell", spy)
+        result = await se.execute_command("sudo systemctl restart nginx",
+                                          sudo_password="s3cret-pw")
+        assert result["status"] == "ok"
+        assert "s3cret-pw" not in seen["cmd"]
+        assert seen["stdin"] == asyncio.subprocess.PIPE
+        assert seen["cmd"].startswith("sudo -S")
+
+    @pytest.mark.asyncio
+    async def test_aur_helper_password_not_in_command_line(self, monkeypatch):
+        import asyncio
+        import services.shell_exec as se
+
+        seen: dict = {}
+        real = asyncio.create_subprocess_shell
+
+        async def spy(cmd, **kwargs):
+            seen["cmd"] = cmd
+            kwargs["stdin"] = asyncio.subprocess.PIPE
+            return await real("cat >/dev/null; true", **kwargs)
+
+        monkeypatch.setattr(se.asyncio, "create_subprocess_shell", spy)
+        result = await se.execute_command("paru -Syu", sudo_password="s3cret-pw")
+        assert result["status"] == "ok"
+        assert "s3cret-pw" not in seen["cmd"]
+        assert "paru -Syu" in seen["cmd"]

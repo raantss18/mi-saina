@@ -35,7 +35,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(cfg_router, "SKILLS_DIR", skills_dir)
 
     from main import app
-    with TestClient(app) as c:
+    with TestClient(app, base_url="http://localhost") as c:
         yield c
 
 
@@ -291,6 +291,15 @@ def test_skill_name_sanitized_in_filename(client):
     }
     resp = client.post("/config/skills", json=skill)
     assert resp.status_code == 200
+
+
+def test_skill_name_only_specials_rejected(client):
+    """Un nom qui se vide à la sanitisation créerait un fichier caché « .json »."""
+    skill = {"name": "!!! ///", "trigger": "/x", "description": "d",
+             "icon": "⚡", "prompt": "p"}
+    resp = client.post("/config/skills", json=skill)
+    assert resp.status_code == 400
+    assert client.delete("/config/skills/!!!").status_code == 400
 
 
 # ── /models ───────────────────────────────────────────────────────────────────

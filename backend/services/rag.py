@@ -50,6 +50,17 @@ def _chunk(text: str, size: int = 1000, overlap: int = 150) -> list[str]:
     return chunks
 
 
+# Dossiers ignorés à l'indexation : cachés (.git, .cache…) et artefacts de build
+# (node_modules, __pycache__, venv…) — sinon on indexe des milliers de fichiers
+# de dépendances au lieu des documents de l'utilisateur.
+_SKIP_DIRS = {"node_modules", "__pycache__", "venv", ".venv", "env",
+              "target", "build", "dist", ".git"}
+
+
+def _skip_dir(part: str) -> bool:
+    return part.startswith(".") or part in _SKIP_DIRS
+
+
 async def index_folder(folder: str, max_files: int = 300, max_chunks_per_file: int = 80):
     """Indexe (ou ré-indexe) les documents d'un dossier. Générateur de progression."""
     root = Path(folder).expanduser()
@@ -57,7 +68,9 @@ async def index_folder(folder: str, max_files: int = 300, max_chunks_per_file: i
         yield {"error": f"Dossier introuvable : {folder}"}
         return
     files = [p for p in sorted(root.rglob("*"))
-             if p.is_file() and documents.is_supported(p.name)]
+             if p.is_file() and documents.is_supported(p.name)
+             and not any(_skip_dir(part) for part in p.relative_to(root).parts[:-1])
+             and not p.name.startswith(".")]
     files = files[:max_files]
     if not files:
         yield {"error": f"Aucun document pris en charge dans {folder}"}
