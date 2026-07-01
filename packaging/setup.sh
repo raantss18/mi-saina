@@ -32,19 +32,33 @@ SUDO="sudo"
 
 UPDATING=""; [ -d "$PREFIX" ] && UPDATING=1 && info "Installation existante détectée → mise à jour (config/données préservées)."
 
-# ── 1. Dépendances de base (curl) ─────────────────────────────────
+# ── 1. Dépendances de base (curl) + runtime graphique du binaire ──
+# Le binaire desktop est LIVRÉ pré-compilé : ses bibliothèques runtime doivent
+# être présentes sur la machine. La barre système (tray) charge dynamiquement
+# libappindicator3.so.1 → absente sur une install GNOME fraîche (Fedora, etc.),
+# l'appli paniquait au lancement (issue #3). On installe donc le runtime ici.
 . /etc/os-release 2>/dev/null || true
 IDS="${ID:-} ${ID_LIKE:-}"
-INSTALL=""
-if   echo "$IDS" | grep -qiE 'arch';            then INSTALL="$SUDO pacman -S --needed --noconfirm"
-elif echo "$IDS" | grep -qiE 'debian|ubuntu';   then INSTALL="$SUDO apt-get install -y"; $SUDO apt-get update -y || true
-elif echo "$IDS" | grep -qiE 'fedora|rhel|centos'; then INSTALL="$SUDO dnf install -y"
-elif echo "$IDS" | grep -qiE 'suse';            then INSTALL="$SUDO zypper install -y"
-elif have apk;                                   then INSTALL="$SUDO apk add"
-elif have xbps-install;                          then INSTALL="$SUDO xbps-install -Sy"
+INSTALL=""; RUNTIME_PKGS=""
+if   echo "$IDS" | grep -qiE 'arch';            then INSTALL="$SUDO pacman -S --needed --noconfirm"; RUNTIME_PKGS="webkit2gtk-4.1 libappindicator-gtk3 librsvg"
+elif echo "$IDS" | grep -qiE 'debian|ubuntu';   then INSTALL="$SUDO apt-get install -y"; $SUDO apt-get update -y || true; RUNTIME_PKGS="libwebkit2gtk-4.1-0 libayatana-appindicator3-1 librsvg2-2"
+elif echo "$IDS" | grep -qiE 'fedora|rhel|centos'; then INSTALL="$SUDO dnf install -y"; RUNTIME_PKGS="webkit2gtk4.1 libappindicator-gtk3 librsvg2"
+elif echo "$IDS" | grep -qiE 'suse';            then INSTALL="$SUDO zypper install -y"; RUNTIME_PKGS="webkit2gtk3 libappindicator3-1 librsvg-2-2"
+elif have apk;                                   then INSTALL="$SUDO apk add"; RUNTIME_PKGS="webkit2gtk libappindicator librsvg"
+elif have xbps-install;                          then INSTALL="$SUDO xbps-install -Sy"; RUNTIME_PKGS="webkit2gtk libappindicator librsvg"
 fi
 if ! have curl && [ -n "$INSTALL" ]; then info "Installation de curl…"; $INSTALL curl python3 || true; fi
 have python3 || { [ -n "$INSTALL" ] && $INSTALL python3 || err "python3 requis."; }
+
+# Runtime graphique (webkit + appindicator/tray). Best-effort : si un nom de
+# paquet diffère sur une variante de distro, on n'échoue pas l'install pour
+# autant — on prévient juste que la barre système peut manquer.
+if [ -n "$INSTALL" ] && [ -n "$RUNTIME_PKGS" ]; then
+    info "Installation du runtime graphique (webkit, barre système)…"
+    # shellcheck disable=SC2086
+    $INSTALL $RUNTIME_PKGS \
+        || warn "Runtime graphique partiellement installé — si l'appli ne démarre pas, installe le paquet fournissant libappindicator3.so.1 (ex. Fedora : libappindicator-gtk3)."
+fi
 
 # ── 2. Ollama (moteur des modèles) ────────────────────────────────
 if ! have ollama; then
