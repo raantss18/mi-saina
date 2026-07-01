@@ -6,6 +6,7 @@ import os
 from services.memory import (
     create_session, list_sessions, get_session_messages, delete_session,
     search_memory, search_history, set_session_working_dir, get_session_working_dir,
+    truncate_session, delete_message_at,
 )
 
 router = APIRouter()
@@ -44,6 +45,24 @@ def session_messages(session_id: str):
 def remove_session(session_id: str):
     delete_session(session_id)
     return {"status": "deleted"}
+
+
+class TruncateBody(BaseModel):
+    keep: int
+
+
+@router.post("/sessions/{session_id}/truncate")
+def truncate(session_id: str, body: TruncateBody):
+    """Garde les `keep` premiers messages, supprime le reste (régénérer/éditer)."""
+    removed = truncate_session(session_id, body.keep)
+    return {"status": "ok", "removed": removed}
+
+
+@router.delete("/sessions/{session_id}/messages/{index}")
+def delete_message(session_id: str, index: int):
+    """Supprime un message par sa position chronologique (0-indexé)."""
+    ok = delete_message_at(session_id, index)
+    return {"status": "ok" if ok else "not_found"}
 
 
 @router.put("/sessions/{session_id}/working-dir")

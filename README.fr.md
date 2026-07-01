@@ -28,6 +28,7 @@
 - **Carte de configuration** — scan déterministe et sans secrets de `~/.config` et `~/.local` (apps configurées, applis par défaut, tes scripts, thème) : l'assistant connaît ton setup → moins d'erreurs de commandes, moins d'hallucinations, moins de tokens. Index compact injecté, détail lu à la demande. Aucun secret n'est lu.
 - **Outils externes (MCP)** — branche des serveurs d'outils (filesystem, fetch web, git…) — *optionnel*.
 - **Gestion de modèles** depuis l'interface, **skills** (slash-commands) personnalisables, **pièces jointes** (texte + images).
+- **Chat enrichi** — blocs de code avec **coloration syntaxique** et copie en un clic (sans dépendance), et actions par message : **éditer et renvoyer** (branche la conversation), régénérer une réponse, supprimer.
 - **Fenêtre desktop native** (Tauri) — appli dans le menu Applications, **icône dans la barre système** au démarrage, raccourci global, notifications, palette de commandes ⌘K, thème clair/sombre/auto. Indépendante du navigateur et du bureau (KDE/GNOME/XFCE/Wayland).
 
 ---

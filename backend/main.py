@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     # (rien à nettoyer : les tâches de fond meurent avec le process)
 
 
-app = FastAPI(title="mi-saina API", version="1.1.2", lifespan=lifespan)
+app = FastAPI(title="mi-saina API", version="1.2.0", lifespan=lifespan)
 
 
 # Réexport (compat tests/imports existants) — source unique : security.py

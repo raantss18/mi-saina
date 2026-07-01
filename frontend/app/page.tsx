@@ -415,6 +415,52 @@ export default function Home() {
     if (lastUserMsg) sendMessage(lastUserMsg);
   };
 
+  // ── Édition / branche / régénération d'un message ────────────────────────
+  // Les pseudo-messages « shell »/« plan » ne sont PAS en base : seuls user &
+  // assistant le sont. On mappe donc l'index du fil (frontend) vers l'index/coupe
+  // en base pour garder l'historique cohérent (sinon régénérer dupliquait tout).
+  const isDbMsg = (m: Message) => m.role === "user" || m.role === "assistant";
+  const keepBefore = (i: number) => messages.slice(0, i).filter(isDbMsg).length;
+  const dbIndexOf = (i: number) => messages.slice(0, i + 1).filter(isDbMsg).length - 1;
+
+  const truncateBackend = (keep: number) => {
+    if (!sessionId) return Promise.resolve();
+    return fetch(`${API_BASE}/memory/sessions/${sessionId}/truncate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keep }),
+    }).then(() => undefined).catch(() => undefined);
+  };
+
+  // Régénérer une réponse : on repart du message utilisateur qui précède.
+  const regenerateAt = (i: number) => {
+    let pu = i;
+    while (pu >= 0 && messages[pu].role !== "user") pu--;
+    if (pu < 0) return;
+    const content = messages[pu].content;
+    const keep = keepBefore(pu);          // on retire le message user + sa réponse en base
+    setMessages(prev => prev.slice(0, pu));
+    truncateBackend(keep).then(() => setTimeout(() => sendMessage(content), 0));
+  };
+
+  // Éditer un message utilisateur puis renvoyer (branche la conversation ici).
+  const editAt = (i: number, newText: string) => {
+    if (messages[i]?.role !== "user") return;
+    const keep = keepBefore(i);
+    setMessages(prev => prev.slice(0, i));
+    truncateBackend(keep).then(() => setTimeout(() => sendMessage(newText), 0));
+  };
+
+  // Supprimer un message : synchronise la base pour les messages persistés
+  // (user/assistant) ; les blocs shell/plan sont purement locaux.
+  const deleteAt = (i: number) => {
+    const m = messages[i];
+    if (m && isDbMsg(m) && sessionId) {
+      const di = dbIndexOf(i);
+      fetch(`${API_BASE}/memory/sessions/${sessionId}/messages/${di}`, { method: "DELETE" }).catch(() => {});
+    }
+    setMessages(prev => prev.filter((_, j) => j !== i));
+  };
+
   // Artefacts : extrait les blocs de code d'un texte (dédupliqués par contenu).
   const addArtifactsFromText = (text: string) => {
     const found = extractArtifacts(text);
@@ -820,15 +866,9 @@ export default function Home() {
             {messages.length === 0
               ? <WelcomeScreen onPick={pickExample} />
               : <ChatWindow messages={messages} onShellInput={sendShellInput}
-                  onDelete={(i) => setMessages(prev => prev.filter((_, j) => j !== i))}
-                  onRegenerate={(i) => {
-                    let pu = i;
-                    while (pu >= 0 && messages[pu].role !== "user") pu--;
-                    if (pu < 0) return;
-                    const content = messages[pu].content;
-                    setMessages(prev => prev.slice(0, pu));
-                    setTimeout(() => sendMessage(content), 0);
-                  }} />}
+                  onDelete={deleteAt}
+                  onEdit={editAt}
+                  onRegenerate={regenerateAt} />}
           </div>
           {showTerminal && (
             <TerminalPanel

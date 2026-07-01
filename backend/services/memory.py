@@ -212,6 +212,44 @@ def delete_session(session_id: str) -> None:
             db.commit()
 
 
+def _ordered_messages(db, session_id: str) -> list["Message"]:
+    """Messages d'une session dans EXACTEMENT le même ordre que
+    get_session_messages (tri par created_at). Sert de base indexable à la
+    troncature/suppression — l'ordre doit coïncider avec ce que voit le frontend."""
+    return (db.query(Message).filter_by(session_id=session_id)
+            .order_by(Message.created_at).all())
+
+
+def truncate_session(session_id: str, keep: int) -> int:
+    """Supprime les messages AU-DELÀ des `keep` premiers (ordre chronologique).
+    Retourne le nombre supprimé.
+
+    Indispensable pour régénérer/éditer sans **dupliquer** l'historique : sans ça,
+    renvoyer un message ré-empilait la même paire user/assistant en base, et le
+    modèle recevait un contexte incohérent au tour suivant."""
+    keep = max(0, keep)
+    with Session(engine) as db:
+        msgs = _ordered_messages(db, session_id)
+        to_delete = msgs[keep:]
+        for m in to_delete:
+            db.delete(m)
+        if to_delete:
+            db.commit()
+        return len(to_delete)
+
+
+def delete_message_at(session_id: str, index: int) -> bool:
+    """Supprime le message à la position `index` (ordre chronologique). False si
+    l'index est hors bornes."""
+    with Session(engine) as db:
+        msgs = _ordered_messages(db, session_id)
+        if 0 <= index < len(msgs):
+            db.delete(msgs[index])
+            db.commit()
+            return True
+        return False
+
+
 # ── Messages + embeddings (fire-and-forget) ───────────────────────────────────
 
 async def _update_embedding_bg(msg_id: str, content: str) -> None:

@@ -5,57 +5,91 @@
    marcher). Thème clair via [data-theme="light"], auto via prefers-color-scheme
    quand data-theme vaut "auto" ou est absent. */
 :root {
-  --bg: #0d1117;
-  --surface: #161b22;
-  --surface-2: #1c2230;
-  --border: #2a3140;
-  --border-strong: #3a4252;
-  --text: #e6edf3;
-  --text-muted: #9aa4b2;
+  --bg: #0a0e13;
+  --surface: #121820;
+  --surface-2: #1a222c;
+  --border: #232e39;
+  --border-strong: #34424f;
+  --text: #e8eef4;
+  --text-muted: #94a1b0;
   --accent: #7fb89a;
-  --accent-contrast: #0c1710;
+  --accent-strong: #6bcaa0;
+  --accent-contrast: #08130d;
+  /* Dégradé subtil pour les actions primaires (bouton d'envoi, etc.) */
+  --accent-grad: linear-gradient(135deg, #7fb89a 0%, #62b490 100%);
+  --accent-soft: rgba(127, 184, 154, 0.12);
   --green: #3fb950;
   --red: #f85149;
   --yellow: #d29922;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  --radius: 10px;
+  /* Ombre feutrée en deux couches (profondeur douce, façon « soft UI ») */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 12px 34px rgba(0, 0, 0, 0.42);
+  --radius: 12px;
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Inter", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Coloration syntaxique (sombre) */
+  --tok-com: #6b7787;
+  --tok-str: #9ecb8a;
+  --tok-num: #e0a86b;
+  --tok-kw: #7fb0e6;
+  --tok-lit: #c98fd6;
+  --tok-fn: #6fcac0;
+  --tok-var: #e2b04f;
 }
 
 /* Thème clair explicite */
 [data-theme="light"] {
-  --bg: #f6f8fa;
+  --bg: #f7f9fb;
   --surface: #ffffff;
-  --surface-2: #f0f3f7;
-  --border: #d8dee4;
-  --border-strong: #c2cad4;
-  --text: #1f2329;
+  --surface-2: #eef2f6;
+  --border: #e0e6ec;
+  --border-strong: #c6cfd8;
+  --text: #1a1f26;
   --text-muted: #5b6573;
   --accent: #2f7d57;
+  --accent-strong: #256a49;
   --accent-contrast: #ffffff;
+  --accent-grad: linear-gradient(135deg, #3a8f64 0%, #2f7d57 100%);
+  --accent-soft: rgba(47, 125, 87, 0.10);
   --green: #1a7f37;
   --red: #cf222e;
   --yellow: #9a6700;
-  --shadow: 0 8px 30px rgba(140, 149, 159, 0.25);
+  --shadow: 0 1px 2px rgba(140, 149, 159, 0.18), 0 12px 30px rgba(140, 149, 159, 0.22);
+  /* Coloration syntaxique (clair) */
+  --tok-com: #8a94a1;
+  --tok-str: #227a3a;
+  --tok-num: #b25a1a;
+  --tok-kw: #1f5fb0;
+  --tok-lit: #8a3fa0;
+  --tok-fn: #0f7d78;
+  --tok-var: #9a6700;
 }
 
 /* Auto : suit le système quand aucun thème explicite n'est forcé */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #f6f8fa;
+    --bg: #f7f9fb;
     --surface: #ffffff;
-    --surface-2: #f0f3f7;
-    --border: #d8dee4;
-    --border-strong: #c2cad4;
-    --text: #1f2329;
+    --surface-2: #eef2f6;
+    --border: #e0e6ec;
+    --border-strong: #c6cfd8;
+    --text: #1a1f26;
     --text-muted: #5b6573;
     --accent: #2f7d57;
+    --accent-strong: #256a49;
     --accent-contrast: #ffffff;
+    --accent-grad: linear-gradient(135deg, #3a8f64 0%, #2f7d57 100%);
+    --accent-soft: rgba(47, 125, 87, 0.10);
     --green: #1a7f37;
     --red: #cf222e;
     --yellow: #9a6700;
-    --shadow: 0 8px 30px rgba(140, 149, 159, 0.25);
+    --shadow: 0 1px 2px rgba(140, 149, 159, 0.18), 0 12px 30px rgba(140, 149, 159, 0.22);
+    --tok-com: #8a94a1;
+    --tok-str: #227a3a;
+    --tok-num: #b25a1a;
+    --tok-kw: #1f5fb0;
+    --tok-lit: #8a3fa0;
+    --tok-fn: #0f7d78;
+    --tok-var: #9a6700;
   }
 }
 /* Si l'utilisateur force un thème, on neutralise l'auto ci-dessus */
@@ -166,6 +200,42 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
   background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
 }
 .ms-md pre code { background: none; border: none; padding: 0; font-size: 12px; line-height: 1.5; }
+
+/* ── Bloc de code coloré (CodeBlock) ──────────────────────────────────── */
+.ms-code {
+  margin: 8px 0; border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden; background: var(--bg);
+}
+.ms-code-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 10px; background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.ms-code-lang {
+  font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+  color: var(--text-muted); font-family: var(--font-mono);
+}
+.ms-code-copy {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 11px; padding: 2px 6px; border-radius: 5px;
+}
+.ms-code-copy:hover { color: var(--text); background: var(--border); }
+.ms-code pre { margin: 0; padding: 10px 12px; overflow-x: auto; background: none; border: none; }
+.ms-code code {
+  background: none; border: none; padding: 0;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.55;
+}
+/* Jetons de coloration syntaxique */
+.tok-com { color: var(--tok-com); font-style: italic; }
+.tok-str { color: var(--tok-str); }
+.tok-num { color: var(--tok-num); }
+.tok-kw  { color: var(--tok-kw); font-weight: 600; }
+.tok-lit { color: var(--tok-lit); }
+.tok-fn  { color: var(--tok-fn); }
+.tok-var { color: var(--tok-var); }
+
+/* Sélection de texte teintée à l'accent (détail « premium ») */
+::selection { background: var(--accent-soft); }
 /* Tableaux GFM */
 .ms-md table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; max-width: 100%; }
 .ms-md th, .ms-md td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
