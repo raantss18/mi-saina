@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # complet → ne JAMAIS l'exposer au réseau. (Override possible via .env si besoin.)
     HOST: str = "127.0.0.1"
     PORT: int = 8000
+    # Hôtes supplémentaires acceptés par la garde anti-DNS-rebinding (header Host),
+    # séparés par des virgules. Vide = local uniquement (localhost/127.0.0.1/::1).
+    # À ne remplir que si tu exposes VOLONTAIREMENT le backend (déconseillé).
+    EXTRA_ALLOWED_HOSTS: str = ""
     MAX_SEARCH_RESULTS: int = 5
     SHELL_TIMEOUT: int = 30
     # Timeout d'INACTIVITÉ du PTY (s) : on coupe une commande seulement si elle

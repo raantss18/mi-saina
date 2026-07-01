@@ -145,19 +145,26 @@ class Skill(BaseModel):
     prompt: str
 
 
+def _safe_skill_name(name: str) -> str:
+    """Nom de fichier sûr (pas de traversée de chemin, pas de fichier caché).
+    Lève 400 si le nom ne contient aucun caractère utilisable."""
+    safe = "".join(c for c in name if c.isalnum() or c in "-_").strip("-_")
+    if not safe:
+        raise HTTPException(status_code=400, detail="Nom de compétence invalide")
+    return safe
+
+
 @router.post("/skills")
 def create_skill(skill: Skill):
     SKILLS_DIR.mkdir(parents=True, exist_ok=True)
-    safe = "".join(c for c in skill.name if c.isalnum() or c in "-_")
-    path = SKILLS_DIR / f"{safe}.json"
+    path = SKILLS_DIR / f"{_safe_skill_name(skill.name)}.json"
     path.write_text(skill.model_dump_json(indent=2))
     return {"status": "ok", "name": skill.name}
 
 
 @router.delete("/skills/{name}")
 def delete_skill(name: str):
-    safe = "".join(c for c in name if c.isalnum() or c in "-_")
-    path = SKILLS_DIR / f"{safe}.json"
+    path = SKILLS_DIR / f"{_safe_skill_name(name)}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="Skill not found")
     path.unlink()

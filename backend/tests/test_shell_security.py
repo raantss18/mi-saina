@@ -157,6 +157,44 @@ class TestNeedsRoot:
         assert needs_root("systemctl status nginx") is False
 
 
+class TestNeedsRootMultiDistro:
+    """Le README annonce toutes les grandes distros : les opérations d'écriture
+    de leurs gestionnaires de paquets doivent déclencher la demande sudo."""
+
+    def test_apt_write_operations(self):
+        assert needs_root("apt install vim") is True
+        assert needs_root("apt-get remove vim") is True
+        assert needs_root("apt update") is True
+        assert needs_root("apt full-upgrade") is True
+        assert needs_root("apt-get -y dist-upgrade") is True
+
+    def test_dnf_yum_write_operations(self):
+        assert needs_root("dnf install vim") is True
+        assert needs_root("dnf upgrade") is True
+        assert needs_root("yum remove httpd") is True
+
+    def test_zypper_write_operations(self):
+        assert needs_root("zypper install vim") is True
+        assert needs_root("zypper up") is True
+        assert needs_root("zypper dup") is True
+
+    def test_void_alpine(self):
+        assert needs_root("xbps-install -Su") is True
+        assert needs_root("xbps-remove vim") is True
+        assert needs_root("apk add vim") is True
+        assert needs_root("apk upgrade") is True
+
+    def test_read_only_operations_do_not_need_root(self):
+        assert needs_root("apt search vim") is False
+        assert needs_root("apt list --upgradable") is False
+        assert needs_root("dnf search vim") is False
+        assert needs_root("dnf info vim") is False
+        assert needs_root("zypper search vim") is False
+        assert needs_root("apk search vim") is False
+        assert needs_root("apk info") is False
+        assert needs_root("xbps-query -Rs vim") is False
+
+
 # ── _strip_leading_sudo ───────────────────────────────────────────────────────
 
 class TestStripLeadingSudo:

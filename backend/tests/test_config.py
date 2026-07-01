@@ -77,7 +77,7 @@ class TestSettingsEndpoints:
         monkeypatch.setattr(config_module, "_OVERRIDES_FILE", tmp_path / "settings.json")
         saved = current_settings()
         from main import app
-        with TestClient(app) as c:
+        with TestClient(app, base_url="http://localhost") as c:
             yield c
         for k, v in saved.items():
             setattr(settings, k, v)

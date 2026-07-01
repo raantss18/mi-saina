@@ -150,7 +150,7 @@ Root commands ask for your sudo password in a dedicated dialog — passwords are
 
 ## 🔒 Privacy & security
 
-Everything is local: the backend listens on **127.0.0.1 only**, validates request origins (anti-CSWSH/CSRF), blocks catastrophic commands, and asks confirmation before destructive ones. Your documents, conversations, memory and profile stay on your machine and are never versioned.
+Everything is local: the backend listens on **127.0.0.1 only**, validates request origins **and the Host header** (anti-CSWSH/CSRF/**DNS-rebinding**), blocks catastrophic commands, and asks confirmation before destructive ones. The sudo password is passed via stdin only (never on a command line, never stored). Software updates verify the installer's **SHA-256** when the release publishes one. Your documents, conversations, memory and profile stay on your machine and are never versioned.
 
 ---
 

@@ -105,7 +105,7 @@ Ny baiko root dia mangataka ny tenimiafina sudo ao anaty boaty manokana — tsy 
 
 ## 🔒 Tsiambaratelo & filaminana
 
-An-toerana ny zava-drehetra: ny backend dia mihaino **127.0.0.1 ihany**, manamarina ny niavian'ny fangatahana (anti-CSWSH/CSRF), manakana ny baiko mampidi-doza, ary mangataka fanamarinana alohan'ny baiko mandrava. Ny antontan-taratasinao, resaka, fitadidiana ary profil dia mijanona ao amin'ny milinanao.
+An-toerana ny zava-drehetra: ny backend dia mihaino **127.0.0.1 ihany**, manamarina ny niavian'ny fangatahana sy ny lohapejy Host (anti-CSWSH/CSRF/DNS-rebinding), manakana ny baiko mampidi-doza, ary mangataka fanamarinana alohan'ny baiko mandrava. Ny antontan-taratasinao, resaka, fitadidiana ary profil dia mijanona ao amin'ny milinanao.
 
 ---
 

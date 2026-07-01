@@ -1,11 +1,11 @@
 import asyncio
 from contextlib import asynccontextmanager
-from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+import security
 from routers import (chat, shell, search, memory as memory_router,
                      models as models_router, config_router, schedule, update, rag,
                      health as health_router)
@@ -31,25 +31,23 @@ async def lifespan(app: FastAPI):
     # (rien à nettoyer : les tâches de fond meurent avec le process)
 
 
-app = FastAPI(title="mi-saina API", version="1.1.1", lifespan=lifespan)
+app = FastAPI(title="mi-saina API", version="1.1.2", lifespan=lifespan)
 
 
-def _origin_allowed(origin: str | None) -> bool:
-    """N'autorise que les origines locales (web dev) et l'appli desktop (tauri)."""
-    if not origin:
-        return True  # clients natifs/CLI locaux (pas d'origine de navigateur)
-    if origin.startswith("tauri://"):
-        return True
-    host = (urlparse(origin).hostname or "").lower()
-    return host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost")
+# Réexport (compat tests/imports existants) — source unique : security.py
+_origin_allowed = security.origin_allowed
+_host_allowed = security.host_allowed
 
 
 @app.middleware("http")
-async def _origin_guard(request: Request, call_next):
-    """Anti-CSRF/DNS-rebinding : un site web malveillant ouvert localement ne doit
-    pas pouvoir déclencher d'endpoints (le backend exécute des commandes shell).
-    Les requêtes sans Origin (app native, curl) passent ; les origines distantes
-    de navigateur sont refusées."""
+async def _local_guard(request: Request, call_next):
+    """Anti-CSRF/DNS-rebinding : un site web malveillant ne doit pas pouvoir
+    déclencher d'endpoints (le backend exécute des commandes shell).
+    - Host non local → refusé (DNS rebinding).
+    - Origine distante de navigateur → refusée (CSRF) ; l'absence d'Origin
+      (app native, curl local) est tolérée une fois le Host validé."""
+    if not _host_allowed(request.headers.get("host")):
+        return JSONResponse({"detail": "hôte non autorisé"}, status_code=403)
     if not _origin_allowed(request.headers.get("origin")):
         return JSONResponse({"detail": "origine non autorisée"}, status_code=403)
     return await call_next(request)

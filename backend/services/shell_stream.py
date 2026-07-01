@@ -114,6 +114,23 @@ def _is_aur_helper(cmd: str) -> bool:
     return _first_token(cmd) in AUR_HELPERS
 
 
+# Gestionnaires de paquets multi-distro : opérations qui ÉCRIVENT sur le système
+# (install/remove/upgrade…) → root requis. Les sous-commandes read-only (search,
+# list, info, show…) ne matchent volontairement pas. Aligné sur le README :
+# apt (Debian/Ubuntu), dnf/yum (Fedora/RHEL), zypper (openSUSE), xbps (Void), apk (Alpine).
+_PKG_ROOT_RE = re.compile(
+    r"\b(?:apt|apt-get|aptitude)\s+(?:-\S+\s+)*"
+    r"(?:install|reinstall|remove|purge|upgrade|full-upgrade|dist-upgrade|autoremove|update)\b"
+    r"|\b(?:dnf|yum)\s+(?:-\S+\s+)*"
+    r"(?:install|reinstall|remove|erase|upgrade|update|downgrade|autoremove|swap|distro-sync)\b"
+    r"|\bzypper\s+(?:-\S+\s+)*"
+    r"(?:install|in|remove|rm|update|up|dist-upgrade|dup|patch|refresh|ref)\b"
+    r"|\b(?:xbps-install|xbps-remove|xbps-reconfigure)\b"
+    r"|\bapk\s+(?:-\S+\s+)*(?:add|del|upgrade|update|fix)\b",
+    re.IGNORECASE,
+)
+
+
 def needs_root(cmd: str) -> bool:
     """La commande nécessite-t-elle des privilèges root ?"""
     s = cmd.strip()
@@ -122,6 +139,8 @@ def needs_root(cmd: str) -> bool:
     if _is_aur_helper(s):                       # paru/yay escaladent eux-mêmes
         return True
     if re.search(r'\bpacman\s+-{1,2}\w*[SRUD]', s):   # -S, -R, -U, -D, -Syu...
+        return True
+    if _PKG_ROOT_RE.search(s):                  # apt/dnf/zypper/xbps/apk (écriture)
         return True
     if re.search(r'\bsystemctl\s+(?!--user\b)(enable|disable|start|stop|restart|reload|mask|unmask|daemon-reload)', s):
         return True
