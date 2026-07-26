@@ -694,14 +694,16 @@ export default function Home() {
   });
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "var(--bg)" }}>
+    <div className="ms-app" style={{ display: "flex", background: "var(--bg)" }}>
       {sidebarOpen && (
+        <div className="ms-sidebar" onClick={(e) => e.stopPropagation()}>
         <MemoryPanel
           activeSessionId={sessionId}
           onSelectSession={(id) => { loadSession(id); setPanel(null); }}
           onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); setSessionTitle(""); setWorkingDir(null); }}
           refreshKey={memoryRefresh}
         />
+        </div>
       )}
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
