@@ -706,7 +706,7 @@ export default function Home() {
         </div>
       )}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Header */}
         <div style={{
           padding: "6px 16px", borderBottom: "1px solid var(--border)",
@@ -864,7 +864,7 @@ export default function Home() {
 
         {/* Chat + Terminal (panneau optionnel à côté) */}
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {messages.length === 0
               ? <WelcomeScreen onPick={pickExample} />
               : <ChatWindow messages={messages} onShellInput={sendShellInput}
