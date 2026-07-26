@@ -6,10 +6,16 @@ import type { NextConfig } from "next";
 // changer le comportement du build web par défaut.
 const desktop = process.env.MS_DESKTOP === "1";
 
+// Sous-chemin quand l'appli est servie derriere un reverse proxy (ex: Caddy sur
+// /mi-saina). Vide par defaut : sans MS_BASE_PATH, rien ne change.
+// Incompatible avec le build desktop, qui sert toujours depuis la racine.
+const basePath = !desktop ? (process.env.MS_BASE_PATH ?? "") : "";
+
 const nextConfig: NextConfig = {
   ...(desktop
     ? { output: "export", images: { unoptimized: true } }
     : {}),
+  ...(basePath ? { basePath, assetPrefix: basePath } : {}),
 };
 
 export default nextConfig;
