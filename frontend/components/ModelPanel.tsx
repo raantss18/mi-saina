@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
-import { t } from "../lib/i18n";
+import { t, tf } from "../lib/i18n";
 import { modelDesc as desc } from "../lib/models";
 
 interface OllamaModel {
@@ -64,7 +64,7 @@ export default function ModelPanel({ onModelChange }: Props) {
   };
 
   const handleDelete = async (name: string) => {
-    if (!confirm(`Supprimer "${name}" ? (${models.find(m => m.name === name)?.size_gb}GB libérés)`)) return;
+    if (!confirm(tf("confirmDeleteModel", { name, gb: models.find(m => m.name === name)?.size_gb }))) return;
     setActionModel(name);
     setActionType("delete");
     setError("");

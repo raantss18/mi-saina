@@ -293,10 +293,20 @@ const T: Dict = {
   searchPlaceholder: { en: "Search your history (keywords or meaning)…", fr: "Rechercher dans l'historique (mots-clés ou sens)…", mg: "Hikaroka ao amin'ny tantara (teny na hevitra)…" },
   searchTitle: { en: "SEARCH", fr: "RECHERCHE", mg: "FIKAROHANA" },
   searchNone: { en: "No result.", fr: "Aucun résultat.", mg: "Tsy misy valiny." },
+
+  // Confirmations de suppression ({name}, {gb} remplacés par tf())
+  confirmDeleteSession: { en: "Delete this session?", fr: "Supprimer cette session ?", mg: "Hofafana ity session ity?" },
+  confirmDeleteSkill: { en: "Delete the skill \"{name}\"?", fr: "Supprimer le skill « {name} » ?", mg: "Hofafana ny skill « {name} »?" },
+  confirmDeleteModel: { en: "Delete \"{name}\"? ({gb} GB freed)", fr: "Supprimer « {name} » ? ({gb} Go libérés)", mg: "Hofafana « {name} »? ({gb} Go afaka)" },
 };
 
 export function t(key: keyof typeof T): string {
   const e = T[key];
   if (!e) return key as string;
   return e[getLang()] || e.en;
+}
+
+/** t() avec substitution des {variables}. */
+export function tf(key: keyof typeof T, vars: Record<string, string | number | undefined>): string {
+  return t(key).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 }

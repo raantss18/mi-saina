@@ -61,7 +61,7 @@ export default function MemoryPanel({ activeSessionId, onSelectSession, onNewSes
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm("Supprimer cette session ?")) return;
+    if (!confirm(t("confirmDeleteSession"))) return;
     await fetch(`${API_BASE}/memory/sessions/${id}`, { method: "DELETE" });
     fetchSessions();
   };

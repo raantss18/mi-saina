@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "../lib/config";
 import { isTauri, isAutostartEnabled, setAutostart } from "../lib/desktop";
-import { getLang, setLang, Lang, t } from "../lib/i18n";
+import { getLang, setLang, Lang, t, tf } from "../lib/i18n";
 import ModelPanel from "./ModelPanel";
 
 interface Skill {
@@ -213,7 +213,7 @@ export default function ConfigPanel({ onModelChange }: { onModelChange?: (m: str
   };
 
   const deleteSkill = async (name: string) => {
-    if (!confirm(`Supprimer le skill "${name}" ?`)) return;
+    if (!confirm(tf("confirmDeleteSkill", { name }))) return;
     await fetch(`${API_BASE}/config/skills/${encodeURIComponent(name)}`, { method: "DELETE" });
     fetchSkills();
   };
