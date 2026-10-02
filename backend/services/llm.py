@@ -1,6 +1,11 @@
+import logging
+
 import ollama
 from config import settings
+from services import openrouter
 from services.sysinfo import recommended_num_ctx
+
+log = logging.getLogger(__name__)
 
 
 def select_model(task_type: str) -> str:
@@ -90,6 +95,17 @@ async def stream_response(messages: list, task_type: str = "reason",
     # [mi-saina-improve] `think` per-requête : permet le THINKING CONDITIONNEL piloté
     # par task_classifier (SIMPLE → off). None = comportement historique (réglage THINK).
     model = select_model(task_type)
+
+    # Secours cloud gratuit (LLM_BACKEND=openrouter) : on tente les modèles à 0 $
+    # puis on retombe silencieusement sur Ollama si le quota est épuisé.
+    if openrouter.enabled():
+        try:
+            async for piece in openrouter.stream_response(messages):
+                yield piece
+            return
+        except openrouter.OpenRouterUnavailable as exc:
+            log.warning("OpenRouter indisponible (%s) → repli Ollama %s", exc, model)
+
     client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
     kwargs = dict(model=model, messages=messages, stream=True, options=_options())
     if think is None:
@@ -130,6 +146,13 @@ async def complete(messages: list, model: str | None = None,
                    think: bool | None = None) -> str:
     """Réponse complète (non streamée). `think=False` désactive le raisonnement
     (utile pour les tâches utilitaires : sinon le « thinking » consomme le budget)."""
+    if openrouter.enabled():
+        try:
+            return await openrouter.complete(messages, num_predict=num_predict,
+                                             temperature=temperature)
+        except openrouter.OpenRouterUnavailable as exc:
+            log.warning("OpenRouter indisponible (%s) → repli Ollama", exc)
+
     client = ollama.AsyncClient(host=settings.OLLAMA_BASE_URL)
     kwargs = dict(
         model=model or settings.REASONING_MODEL,

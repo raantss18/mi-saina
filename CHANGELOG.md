@@ -8,6 +8,17 @@ versionnage [SemVer](https://semver.org/lang/fr/).
 > (`v1.0.0` → `v1.0.10`). Le travail d'ingénierie réalisé avant la première
 > release publique (03–05 juin) est consolidé dans la section **[1.0.0]**.
 
+## [Non publié]
+
+### Ajouté
+- **Secours cloud gratuit OpenRouter (optionnel, désactivé par défaut)** — `LLM_BACKEND=openrouter` + `OPENROUTER_API_KEY` : les modèles à 0 $ sont essayés dans l'ordre de `OPENROUTER_MODELS`, puis repli automatique sur Ollama (quota, réseau, clé). Chaque requête plafonne `provider.max_price` à 0 : aucun frais possible. ⚠ Dans ce mode, les messages sortent de la machine.
+
+### Corrigé
+- Interface tactile : défilement qui poussait la zone de saisie hors de l'écran (#5).
+
+### Détail
+- +6 tests (`test_openrouter.py`) : plafond de prix, chaîne de repli, balises `<think>` bien formées même si le flux est coupé, pas de rejeu après le premier token. 557 tests backend.
+
 ## [1.2.0] - 2026-07-01
 
 > Jalon **1.2** — « chat plus vivant » : rendu du code coloré, actions par message

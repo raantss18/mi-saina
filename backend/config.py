@@ -88,6 +88,22 @@ class Settings(BaseSettings):
     # détail consultable à la demande. Aucune valeur sensible lue. ~1×/jour.
     CONFIG_MAP: bool = True
 
+    # ── Secours cloud 100 % gratuit (OpenRouter) ───────────────────────────────
+    # "ollama"     → tout en local (défaut : mi-saina reste un assistant local)
+    # "openrouter" → modèles gratuits OpenRouter d'abord, repli Ollama si échec.
+    # ⚠ En mode "openrouter" les messages SORTENT de la machine. Ne l'active que
+    # pour les tâches non sensibles (long contexte, gros raisonnement).
+    LLM_BACKEND: str = "ollama"
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    # Chaîne de repli, séparée par des virgules. UNIQUEMENT des modèles à 0 $ :
+    # chaque requête envoie aussi provider.max_price=0, donc aucun frais possible.
+    OPENROUTER_MODELS: str = ("nvidia/nemotron-3-ultra-550b-a55b:free,"
+                              "thinkingmachines/inkling:free,"
+                              "nvidia/nemotron-3-super-120b-a12b:free,"
+                              "openrouter/free")
+    OPENROUTER_TIMEOUT: int = 120
+
     # Pydantic v2 : configuration via model_config (la classe imbriquée « Config »
     # est dépréciée). `extra="ignore"` tolère d'anciennes clés .env inconnues.
     model_config = SettingsConfigDict(env_file=str(_ENV_FILE), extra="ignore")
