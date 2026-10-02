@@ -694,17 +694,19 @@ export default function Home() {
   });
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "var(--bg)" }}>
+    <div className="ms-app" style={{ display: "flex", background: "var(--bg)" }}>
       {sidebarOpen && (
+        <div className="ms-sidebar" onClick={(e) => e.stopPropagation()}>
         <MemoryPanel
           activeSessionId={sessionId}
           onSelectSession={(id) => { loadSession(id); setPanel(null); }}
           onNewSession={(id) => { setSessionId(id); setMessages([]); setTaskStatus("idle"); setPanel(null); setSessionTitle(""); setWorkingDir(null); }}
           refreshKey={memoryRefresh}
         />
+        </div>
       )}
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {/* Header */}
         <div style={{
           padding: "6px 16px", borderBottom: "1px solid var(--border)",
@@ -862,7 +864,7 @@ export default function Home() {
 
         {/* Chat + Terminal (panneau optionnel à côté) */}
         <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {messages.length === 0
               ? <WelcomeScreen onPick={pickExample} />
               : <ChatWindow messages={messages} onShellInput={sendShellInput}

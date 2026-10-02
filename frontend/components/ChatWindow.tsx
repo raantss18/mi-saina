@@ -232,8 +232,12 @@ export default function ChatWindow({ messages, onShellInput, onRegenerate, onDel
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // `minHeight: 0` est indispensable : un element flex refuse par defaut de
+  // descendre sous la taille de son contenu. Sans lui, cette zone ne defile pas
+  // — elle grandit et pousse la saisie hors de l'ecran, ou l'`overflow: hidden`
+  // du corps la rend inatteignable. Invisible sur grand ecran.
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
       {messages.length === 0 && (
         <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", marginTop: 60 }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>◈</div>
